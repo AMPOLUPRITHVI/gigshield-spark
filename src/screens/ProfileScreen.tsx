@@ -1,12 +1,21 @@
 import { motion } from "framer-motion";
-import { User, Shield, BarChart3, Settings, ChevronRight, Server } from "lucide-react";
+import { User, Shield, BarChart3, Settings, ChevronRight, Server, PieChart } from "lucide-react";
+import { getUser, getClaims, exportData } from "../lib/store";
 
-const ProfileScreen = () => {
+interface ProfileScreenProps {
+  onNavigate: (screen: string) => void;
+}
+
+const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
+  const user = getUser();
+  const claims = getClaims();
+  const totalPayout = claims.reduce((s, c) => s + c.amount, 0);
+
   const menuItems = [
-    { icon: Shield, label: "Admin Dashboard", desc: "Claims, fraud alerts, analytics" },
-    { icon: Server, label: "System Architecture", desc: "Frontend → API → AI → DB → Payment" },
-    { icon: BarChart3, label: "Analytics", desc: "Performance & insights" },
-    { icon: Settings, label: "Settings", desc: "Account preferences" },
+    { icon: Shield, label: "Admin Dashboard", desc: "Claims, fraud alerts, analytics", target: "admin" },
+    { icon: PieChart, label: "Analytics", desc: "Performance & insights", target: "analytics" },
+    { icon: Server, label: "System Architecture", desc: "Frontend → API → AI → DB → Payment", target: "" },
+    { icon: Settings, label: "Settings", desc: "Account preferences", target: "settings" },
   ];
 
   return (
@@ -21,18 +30,18 @@ const ProfileScreen = () => {
           <User size={28} className="text-foreground" />
         </div>
         <div>
-          <h2 className="font-bold text-foreground text-lg">Prudhvi</h2>
-          <p className="text-sm text-muted-foreground">Gig Worker · Active</p>
-          <p className="text-xs neon-text-green mt-0.5">Standard Plan</p>
+          <h2 className="font-bold text-foreground text-lg">{user?.name || "User"}</h2>
+          <p className="text-sm text-muted-foreground">Gig Worker · {user?.city || "Unknown"}</p>
+          <p className="text-xs neon-text-green mt-0.5">{user?.plan === "none" ? "No Plan" : `${user?.plan} Plan`}</p>
         </div>
       </motion.div>
 
       {/* Admin Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Total Claims", value: "24" },
+          { label: "Total Claims", value: String(claims.length) },
           { label: "Fraud Alerts", value: "2" },
-          { label: "Payout", value: "₹8.4K" },
+          { label: "Payout", value: `₹${totalPayout >= 1000 ? `${(totalPayout / 1000).toFixed(1)}K` : totalPayout}` },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -55,6 +64,7 @@ const ProfileScreen = () => {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.08 }}
+            onClick={() => item.target && onNavigate(item.target)}
             className="glass-card w-full p-4 flex items-center gap-3 text-left hover:border-white/20 transition-all duration-300"
           >
             <div className="p-2 rounded-xl gradient-primary">
@@ -80,6 +90,12 @@ const ProfileScreen = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Export */}
+      <div className="flex gap-3">
+        <button onClick={() => exportData("json")} className="flex-1 btn-primary-glow text-sm py-2">Export JSON</button>
+        <button onClick={() => exportData("csv")} className="flex-1 glass-card text-sm py-2 text-foreground font-semibold text-center">Export CSV</button>
       </div>
     </div>
   );
