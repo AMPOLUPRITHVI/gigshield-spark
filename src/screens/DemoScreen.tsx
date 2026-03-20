@@ -2,13 +2,31 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CloudRain, Zap, TrendingDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import PaymentPopup from "../components/PaymentPopup";
+import { addClaim } from "../lib/store";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "loading" | "success">("idle");
+  const [income, setIncome] = useState(800);
+  const [lossPct, setLossPct] = useState(50);
+
+  const payout = Math.round(income * (lossPct / 100));
 
   const handleSimulate = () => {
     setStep("loading");
     setTimeout(() => setStep("success"), 2000);
+  };
+
+  const handleClose = () => {
+    const txnId = `TXN${Math.floor(100000 + Math.random() * 900000)}`;
+    const time = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+    addClaim({
+      type: "Rain Claim",
+      amount: payout,
+      txnId,
+      date: `Just now, ${time}`,
+      status: "Credited",
+    });
+    setStep("idle");
   };
 
   return (
@@ -36,9 +54,9 @@ const DemoScreen = () => {
 
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Income", value: "₹800/day", icon: TrendingDown },
+            { label: "Income", value: `₹${income}/day`, icon: TrendingDown },
             { label: "Rain", value: "YES", icon: CloudRain },
-            { label: "Loss", value: "50%", icon: Zap },
+            { label: "Loss", value: `${lossPct}%`, icon: Zap },
           ].map((item) => (
             <div key={item.label} className="glass-card p-3 text-center space-y-1">
               <item.icon size={16} className="mx-auto text-muted-foreground" />
@@ -49,20 +67,48 @@ const DemoScreen = () => {
         </div>
       </motion.div>
 
+      {/* Editable Inputs */}
+      <div className="glass-card p-4 space-y-4">
+        <div className="space-y-2">
+          <label className="text-xs text-muted-foreground">Daily Income (₹)</label>
+          <input
+            type="number"
+            value={income}
+            onChange={(e) => setIncome(Math.max(0, Number(e.target.value)))}
+            className="w-full glass-card p-3 bg-transparent text-foreground outline-none rounded-xl text-sm font-semibold"
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Loss Percentage</span>
+            <span className="text-foreground font-semibold">{lossPct}%</span>
+          </div>
+          <input
+            type="range"
+            min={10}
+            max={100}
+            step={5}
+            value={lossPct}
+            onChange={(e) => setLossPct(Number(e.target.value))}
+            className="w-full accent-accent"
+          />
+        </div>
+      </div>
+
       {/* Claim Calculation */}
       <div className="glass-card p-4 space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Daily Income</span>
-          <span className="text-foreground">₹800</span>
+          <span className="text-foreground">₹{income}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Loss Percentage</span>
-          <span className="text-destructive">-50%</span>
+          <span className="text-destructive">-{lossPct}%</span>
         </div>
         <div className="h-px bg-white/10 my-1" />
         <div className="flex justify-between text-sm font-bold">
           <span className="text-foreground">Claim Amount</span>
-          <span className="neon-text-green">₹400</span>
+          <span className="neon-text-green">₹{payout}</span>
         </div>
       </div>
 
@@ -106,8 +152,8 @@ const DemoScreen = () => {
       {/* Payment Popup */}
       <PaymentPopup
         open={step === "success"}
-        onClose={() => setStep("idle")}
-        amount={400}
+        onClose={handleClose}
+        amount={payout}
       />
     </div>
   );
