@@ -1,19 +1,24 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { Check, Sparkles, Loader2, CheckCircle2, Gauge } from "lucide-react";
 import { useState } from "react";
-import { getUser, saveUser } from "../lib/store";
+import { getUser, saveUser, getRiskScore, calcPremium } from "../lib/store";
 import PaymentPopup from "../components/PaymentPopup";
-
-const plans = [
-  { name: "Basic" as const, price: "₹10/week", coverage: "₹300", amount: 10, features: ["Weather coverage", "Basic claims", "Email support"] },
-  { name: "Standard" as const, price: "₹20/week", coverage: "₹600", amount: 20, features: ["All Basic features", "Priority claims", "24/7 support", "AI risk alerts"], popular: true },
-  { name: "Pro" as const, price: "₹30/week", coverage: "₹1,000", amount: 30, features: ["All Standard features", "Instant payouts", "Multi-risk coverage", "Dedicated manager"] },
-];
 
 const PlansScreen = () => {
   const [selected, setSelected] = useState(1);
   const [step, setStep] = useState<"idle" | "paying" | "success">("idle");
   const user = getUser();
+  const riskScore = getRiskScore();
+
+  const plans = [
+    { name: "Basic" as const, basePrice: 10, coverage: "₹300", features: ["Weather coverage", "Basic claims", "Email support"] },
+    { name: "Standard" as const, basePrice: 20, coverage: "₹600", features: ["All Basic features", "Priority claims", "24/7 support", "AI risk alerts"], popular: true },
+    { name: "Pro" as const, basePrice: 30, coverage: "₹1,000", features: ["All Standard features", "Instant payouts", "Multi-risk coverage", "Dedicated manager"] },
+  ].map((p) => ({
+    ...p,
+    amount: calcPremium(p.basePrice, riskScore),
+    price: `₹${calcPremium(p.basePrice, riskScore)}/week`,
+  }));
 
   const handleSubscribe = () => {
     setStep("paying");
@@ -28,12 +33,30 @@ const PlansScreen = () => {
     setStep("idle");
   };
 
+  const riskLabel = riskScore >= 71 ? "High" : riskScore >= 31 ? "Medium" : "Low";
+  const riskColor = riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green";
+
   return (
     <div className="px-4 pt-4 pb-24 max-w-lg mx-auto space-y-5">
       <div>
         <h2 className="text-xl font-bold text-foreground">Choose Your Plan</h2>
         <p className="text-sm text-muted-foreground mt-1">AI-powered coverage for gig workers</p>
       </div>
+
+      {/* Dynamic pricing banner */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-3 flex items-center gap-3">
+        <Gauge size={16} className={riskColor} />
+        <div className="flex-1">
+          <p className="text-xs text-muted-foreground">Prices adjusted by your risk score</p>
+          <p className="text-sm font-bold">
+            <span className={riskColor}>{riskScore}/100</span>
+            <span className="text-muted-foreground text-xs ml-2">({riskLabel} Risk)</span>
+          </p>
+        </div>
+        <div className="text-[10px] text-muted-foreground text-right">
+          <p>Formula: base + score/10</p>
+        </div>
+      </motion.div>
 
       {user?.plan && user.plan !== "none" && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card-accent p-3 flex items-center gap-2">
@@ -66,6 +89,9 @@ const PlansScreen = () => {
               <div>
                 <h3 className="font-bold text-foreground text-lg">{plan.name}</h3>
                 <p className="text-sm text-muted-foreground">{plan.price}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Base ₹{plan.basePrice} + ₹{Math.round(riskScore / 10)} risk
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-extrabold neon-text-green">{plan.coverage}</p>

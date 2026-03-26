@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
-import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets } from "lucide-react";
+import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets, Gauge, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getUser, getRiskPreference, setRiskPreference } from "../lib/store";
+import { getUser, getRiskScore, setRiskScore } from "../lib/store";
 import { fetchWeather, getUserLocation, type WeatherResult } from "../lib/weather";
 
-const riskLevels = ["Low", "Medium", "High"] as const;
 const riskColors = {
   Low: "neon-text-green",
   Medium: "text-warning",
@@ -13,10 +12,10 @@ const riskColors = {
 
 const HomeScreen = () => {
   const user = getUser();
-  const [risk, setRisk] = useState<(typeof riskLevels)[number]>(getRiskPreference());
   const [showNotif, setShowNotif] = useState(true);
   const [weather, setWeather] = useState<WeatherResult | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(false);
+  const [animatedScore, setAnimatedScore] = useState(0);
 
   const loadWeather = async () => {
     setLoadingWeather(true);
@@ -24,11 +23,11 @@ const HomeScreen = () => {
       const { lat, lon } = await getUserLocation();
       const data = await fetchWeather(lat, lon);
       setWeather(data);
-      setRisk(data.riskLevel);
-      setRiskPreference(data.riskLevel);
+      setRiskScore(data.riskScore);
     } catch {
-      const data = await fetchWeather(17.385, 78.4867); // Hyderabad fallback
+      const data = await fetchWeather(17.385, 78.4867);
       setWeather(data);
+      setRiskScore(data.riskScore);
     } finally {
       setLoadingWeather(false);
     }
@@ -38,18 +37,34 @@ const HomeScreen = () => {
     loadWeather();
   }, []);
 
-  const handleRiskChange = (level: typeof riskLevels[number]) => {
-    setRisk(level);
-    setRiskPreference(level);
-  };
+  // Animated counter for risk score
+  useEffect(() => {
+    if (!weather) return;
+    const target = weather.riskScore;
+    const duration = 1200;
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setAnimatedScore(Math.round(eased * target));
+      if (progress >= 1) clearInterval(interval);
+    }, 16);
+    return () => clearInterval(interval);
+  }, [weather?.riskScore]);
 
-  const earningsProtected = user?.plan === "none" ? "₹0" : risk === "High" ? "₹1,200" : risk === "Medium" ? "₹800" : "₹400";
+  const riskLevel = weather?.riskLevel || "Medium";
+  const riskScore = weather?.riskScore || getRiskScore();
+  const earningsProtected = user?.plan === "none" ? "₹0" : riskLevel === "High" ? "₹1,200" : riskLevel === "Medium" ? "₹800" : "₹400";
   const coverageActive = user?.plan !== "none";
 
+  const scoreColor = riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green";
+  const scoreBg = riskScore >= 71 ? "from-destructive/20 to-destructive/5" : riskScore >= 31 ? "from-warning/20 to-warning/5" : "from-accent/20 to-accent/5";
+
   const cards = [
-    { icon: TrendingUp, label: "Today's Earnings Protected", value: earningsProtected, accent: "neon-blue" },
-    { icon: Shield, label: "Active Coverage", value: coverageActive ? "ON" : "OFF", accent: coverageActive ? "neon-green" : "destructive" },
-    { icon: AlertTriangle, label: "Risk Level Today", value: risk, accent: risk === "High" ? "destructive" : risk === "Medium" ? "warning" : "neon-green" },
+    { icon: TrendingUp, label: "Earnings Protected", value: earningsProtected, accent: "neon-text-blue" },
+    { icon: Shield, label: "Active Coverage", value: coverageActive ? "ON" : "OFF", accent: coverageActive ? "neon-text-green" : "text-destructive" },
+    { icon: AlertTriangle, label: "Risk Level", value: riskLevel, accent: riskColors[riskLevel] },
   ];
 
   const weatherBanner = weather?.rain
@@ -90,14 +105,77 @@ const HomeScreen = () => {
             <span className="flex items-center gap-1"><Thermometer size={12} />{weather.temp}°C</span>
             <span className="flex items-center gap-1"><Droplets size={12} />{weather.humidity}%</span>
             <span className="flex items-center gap-1"><Wind size={12} />{weather.windSpeed} m/s</span>
+            <button onClick={loadWeather} disabled={loadingWeather} className="p-1 rounded-lg hover:bg-muted/50 transition-colors">
+              <RefreshCw size={12} className={loadingWeather ? "animate-spin" : ""} />
+            </button>
           </div>
         </motion.div>
       )}
-      {loadingWeather && (
+      {loadingWeather && !weather && (
         <div className="glass-card p-3 flex items-center justify-center gap-2">
           <Loader2 size={14} className="animate-spin text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Loading weather...</span>
+          <span className="text-xs text-muted-foreground">Detecting location & weather...</span>
         </div>
+      )}
+
+      {/* Risk Score Gauge */}
+      {weather && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={`glass-card-glow p-5 bg-gradient-to-br ${scoreBg}`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Gauge size={16} className="text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">AI Risk Score</span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-4xl font-extrabold ${scoreColor}`}>{animatedScore}</span>
+                <span className="text-sm text-muted-foreground">/100</span>
+              </div>
+              <span className={`text-xs font-semibold ${riskColors[riskLevel]}`}>
+                {riskLevel} Risk
+              </span>
+            </div>
+            {/* Mini circular gauge */}
+            <div className="relative w-20 h-20">
+              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                <path
+                  d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="hsl(var(--muted))"
+                  strokeWidth="3"
+                />
+                <motion.path
+                  d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke={riskScore >= 71 ? "hsl(var(--destructive))" : riskScore >= 31 ? "hsl(var(--warning))" : "hsl(var(--accent))"}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray="100"
+                  initial={{ strokeDashoffset: 100 }}
+                  animate={{ strokeDashoffset: 100 - riskScore }}
+                  transition={{ duration: 1.2, ease: "easeOut" }}
+                />
+              </svg>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+            {[
+              { label: "Rain", value: weather.rain ? "Yes" : "No", factor: "40%" },
+              { label: "Temp", value: `${weather.temp}°`, factor: "30%" },
+              { label: "AQI", value: String(weather.aqi), factor: "20%" },
+              { label: "Wind", value: `${weather.windSpeed}`, factor: "10%" },
+            ].map((f) => (
+              <div key={f.label} className="glass-card p-2 rounded-xl">
+                <p className="text-[9px] text-muted-foreground">{f.label} ({f.factor})</p>
+                <p className="text-xs font-bold text-foreground">{f.value}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       )}
 
       {/* Notification */}
@@ -132,30 +210,6 @@ const HomeScreen = () => {
             </div>
           </motion.div>
         ))}
-      </div>
-
-      {/* Risk Toggle */}
-      <div className="glass-card p-4 space-y-3">
-        <p className="text-sm font-semibold text-foreground">Risk Level Override</p>
-        <div className="flex gap-2">
-          {riskLevels.map((level) => (
-            <button
-              key={level}
-              onClick={() => handleRiskChange(level)}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                risk === level
-                  ? level === "High"
-                    ? "bg-destructive/20 text-destructive border border-destructive/30"
-                    : level === "Medium"
-                    ? "bg-warning/20 text-warning border border-warning/30"
-                    : "bg-accent/20 neon-text-green border border-accent/30"
-                  : "glass-card text-muted-foreground"
-              }`}
-            >
-              {level}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Weather Banner */}

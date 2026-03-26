@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { User, Shield, BarChart3, Settings, ChevronRight, Server, PieChart } from "lucide-react";
-import { getUser, getClaims, exportData } from "../lib/store";
+import { User, Shield, BarChart3, Settings, ChevronRight, Server, PieChart, Gauge } from "lucide-react";
+import { getUser, getClaims, exportData, getRiskScore } from "../lib/store";
 
 interface ProfileScreenProps {
   onNavigate: (screen: string) => void;
@@ -10,6 +10,8 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const user = getUser();
   const claims = getClaims();
   const totalPayout = claims.reduce((s, c) => s + c.amount, 0);
+  const flaggedClaims = claims.filter(c => c.flagged || c.status === "Flagged").length;
+  const riskScore = getRiskScore();
 
   const menuItems = [
     { icon: Shield, label: "Admin Dashboard", desc: "Claims, fraud alerts, analytics", target: "admin" },
@@ -29,18 +31,25 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
         <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center">
           <User size={28} className="text-foreground" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="font-bold text-foreground text-lg">{user?.name || "User"}</h2>
           <p className="text-sm text-muted-foreground">Gig Worker · {user?.city || "Unknown"}</p>
           <p className="text-xs neon-text-green mt-0.5">{user?.plan === "none" ? "No Plan" : `${user?.plan} Plan`}</p>
         </div>
+        <div className="text-center">
+          <Gauge size={14} className="mx-auto text-muted-foreground mb-1" />
+          <p className={`text-lg font-bold ${riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green"}`}>
+            {riskScore}
+          </p>
+          <p className="text-[9px] text-muted-foreground">Risk</p>
+        </div>
       </motion.div>
 
-      {/* Admin Stats */}
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: "Total Claims", value: String(claims.length) },
-          { label: "Fraud Alerts", value: "2" },
+          { label: "Fraud Alerts", value: String(flaggedClaims || 0) },
           { label: "Payout", value: `₹${totalPayout >= 1000 ? `${(totalPayout / 1000).toFixed(1)}K` : totalPayout}` },
         ].map((stat, i) => (
           <motion.div
