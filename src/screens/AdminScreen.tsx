@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { Shield, AlertTriangle, TrendingUp, Users, BarChart3 } from "lucide-react";
+import { Shield, AlertTriangle, TrendingUp, Users, BarChart3, Gauge } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { getClaims } from "../lib/store";
+import { getClaims, getRiskScore } from "../lib/store";
 
 const weeklyData = [
   { day: "Mon", claims: 4, fraud: 0 },
@@ -31,12 +31,14 @@ const riskDistribution = [
 const AdminScreen = () => {
   const claims = getClaims();
   const totalPayout = claims.reduce((s, c) => s + c.amount, 0);
+  const flaggedClaims = claims.filter(c => c.flagged || c.status === "Flagged").length;
+  const riskScore = getRiskScore();
 
   const stats = [
     { icon: BarChart3, label: "Total Claims", value: String(claims.length), accent: "neon-text-blue" },
-    { icon: AlertTriangle, label: "Fraud Alerts", value: "2", accent: "text-destructive" },
+    { icon: AlertTriangle, label: "Fraud Alerts", value: String(flaggedClaims || 2), accent: "text-destructive" },
     { icon: TrendingUp, label: "Total Payout", value: `₹${totalPayout.toLocaleString()}`, accent: "neon-text-green" },
-    { icon: Users, label: "Active Users", value: "156", accent: "neon-text-purple" },
+    { icon: Gauge, label: "Risk Score", value: `${riskScore}/100`, accent: riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green" },
   ];
 
   return (
@@ -66,65 +68,36 @@ const AdminScreen = () => {
       </div>
 
       {/* Weekly Claims Chart */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="glass-card p-4 space-y-3"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Weekly Claims</p>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={weeklyData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 20%, 18%)" />
             <XAxis dataKey="day" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
             <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
-            <Tooltip
-              contentStyle={{
-                background: "hsl(230, 25%, 11%)",
-                border: "1px solid hsl(230, 20%, 18%)",
-                borderRadius: "12px",
-                color: "hsl(210, 40%, 98%)",
-              }}
-            />
+            <Tooltip contentStyle={{ background: "hsl(230, 25%, 11%)", border: "1px solid hsl(230, 20%, 18%)", borderRadius: "12px", color: "hsl(210, 40%, 98%)" }} />
             <Bar dataKey="claims" fill="hsl(250, 80%, 60%)" radius={[6, 6, 0, 0]} />
             <Bar dataKey="fraud" fill="hsl(0, 84%, 60%)" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </motion.div>
 
-      {/* Monthly Earnings Trend */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="glass-card p-4 space-y-3"
-      >
+      {/* Monthly Trend */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Earnings Protected (Monthly)</p>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={monthlyTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 20%, 18%)" />
             <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
             <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
-            <Tooltip
-              contentStyle={{
-                background: "hsl(230, 25%, 11%)",
-                border: "1px solid hsl(230, 20%, 18%)",
-                borderRadius: "12px",
-                color: "hsl(210, 40%, 98%)",
-              }}
-            />
+            <Tooltip contentStyle={{ background: "hsl(230, 25%, 11%)", border: "1px solid hsl(230, 20%, 18%)", borderRadius: "12px", color: "hsl(210, 40%, 98%)" }} />
             <Line type="monotone" dataKey="earnings" stroke="hsl(145, 80%, 50%)" strokeWidth={2} dot={{ r: 4, fill: "hsl(145, 80%, 50%)" }} />
           </LineChart>
         </ResponsiveContainer>
       </motion.div>
 
       {/* Risk Distribution */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="glass-card p-4 space-y-3"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Risk Distribution</p>
         <div className="flex items-center">
           <ResponsiveContainer width="50%" height={140}>
@@ -149,26 +122,27 @@ const AdminScreen = () => {
       </motion.div>
 
       {/* Fraud Alerts */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        className="glass-card p-4 space-y-3"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Shield size={16} className="text-destructive" />
           <p className="text-sm font-semibold text-foreground">Recent Fraud Alerts</p>
         </div>
         {[
           { id: "FA-001", desc: "Duplicate claim detected — Rain coverage", time: "2h ago", severity: "High" },
-          { id: "FA-002", desc: "Unusual payout pattern — User #47", time: "5h ago", severity: "Medium" },
+          { id: "FA-002", desc: "Rapid claim pattern — User flagged", time: "5h ago", severity: "Medium" },
+          { id: "FA-003", desc: "Claim filed with no risk detected", time: "1d ago", severity: "Low" },
         ].map((alert) => (
           <div key={alert.id} className="glass-card p-3 flex items-center gap-3">
-            <AlertTriangle size={16} className={alert.severity === "High" ? "text-destructive" : "text-warning"} />
+            <AlertTriangle size={16} className={alert.severity === "High" ? "text-destructive" : alert.severity === "Medium" ? "text-warning" : "neon-text-green"} />
             <div className="flex-1">
               <p className="text-xs font-semibold text-foreground">{alert.desc}</p>
               <p className="text-[10px] text-muted-foreground">{alert.id} · {alert.time}</p>
             </div>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+              alert.severity === "High" ? "bg-destructive/20 text-destructive" :
+              alert.severity === "Medium" ? "bg-warning/20 text-warning" :
+              "bg-accent/20 neon-text-green"
+            }`}>{alert.severity}</span>
           </div>
         ))}
       </motion.div>

@@ -1,19 +1,36 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { CloudRain, Zap, TrendingDown, Loader2 } from "lucide-react";
+import { CloudRain, Zap, TrendingDown, Loader2, ShieldAlert, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import PaymentPopup from "../components/PaymentPopup";
-import { addClaim } from "../lib/store";
+import { addClaim, checkFraud, recordClaimTime, getRiskScore } from "../lib/store";
 
 const DemoScreen = () => {
-  const [step, setStep] = useState<"idle" | "loading" | "success">("idle");
+  const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
   const [income, setIncome] = useState(800);
   const [lossPct, setLossPct] = useState(50);
+  const [fraudMsg, setFraudMsg] = useState("");
 
   const payout = Math.round(income * (lossPct / 100));
+  const riskScore = getRiskScore();
 
   const handleSimulate = () => {
-    setStep("loading");
-    setTimeout(() => setStep("success"), 2000);
+    setStep("validating");
+
+    // Step 1: Fraud check after 1s
+    setTimeout(() => {
+      const fraudResult = checkFraud(riskScore);
+      if (!fraudResult.passed) {
+        setFraudMsg(fraudResult.reason || "Suspicious activity detected");
+        setStep("fraud");
+        return;
+      }
+      // Step 2: Process claim
+      setStep("loading");
+      setTimeout(() => {
+        recordClaimTime();
+        setStep("success");
+      }, 2000);
+    }, 1200);
   };
 
   const handleClose = () => {
@@ -46,9 +63,15 @@ const DemoScreen = () => {
           <div className="p-2.5 rounded-xl gradient-primary">
             <CloudRain size={22} className="text-foreground" />
           </div>
-          <div>
+          <div className="flex-1">
             <p className="font-bold text-foreground">Rain Scenario</p>
             <p className="text-xs text-muted-foreground">Real-time weather simulation</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Risk Score</p>
+            <p className={`text-sm font-bold ${riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green"}`}>
+              {riskScore}/100
+            </p>
           </div>
         </div>
 
@@ -107,12 +130,12 @@ const DemoScreen = () => {
         </div>
         <div className="h-px bg-white/10 my-1" />
         <div className="flex justify-between text-sm font-bold">
-          <span className="text-foreground">Claim Amount</span>
-          <span className="neon-text-green">₹{payout}</span>
+          <span className="text-foreground">Estimated Payout</span>
+          <span className="neon-text-green text-lg">₹{payout}</span>
         </div>
       </div>
 
-      {/* Simulate Button */}
+      {/* Action Area */}
       <AnimatePresence mode="wait">
         {step === "idle" && (
           <motion.button
@@ -125,6 +148,41 @@ const DemoScreen = () => {
           >
             <Zap size={18} /> Simulate Claim
           </motion.button>
+        )}
+
+        {step === "validating" && (
+          <motion.div
+            key="validating"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="glass-card-glow p-6 text-center space-y-3"
+          >
+            <ShieldAlert size={36} className="mx-auto neon-text-blue animate-pulse" />
+            <p className="text-sm font-semibold text-foreground">🔍 Running risk validation...</p>
+            <p className="text-xs text-muted-foreground">Checking fraud patterns & risk level</p>
+            <div className="flex justify-center gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><CheckCircle2 size={10} className="neon-text-green" /> Risk Check</span>
+              <span className="flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Fraud Scan</span>
+            </div>
+          </motion.div>
+        )}
+
+        {step === "fraud" && (
+          <motion.div
+            key="fraud"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="glass-card p-6 text-center space-y-3 border border-destructive/30"
+          >
+            <AlertTriangle size={36} className="mx-auto text-destructive" />
+            <p className="text-sm font-bold text-destructive">⚠️ Claim Blocked</p>
+            <p className="text-xs text-muted-foreground">{fraudMsg}</p>
+            <button onClick={() => setStep("idle")} className="btn-primary-glow w-full text-sm mt-2">
+              Try Again
+            </button>
+          </motion.div>
         )}
 
         {step === "loading" && (
@@ -144,6 +202,11 @@ const DemoScreen = () => {
                 animate={{ width: "100%" }}
                 transition={{ duration: 2 }}
               />
+            </div>
+            <div className="flex justify-center gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><CheckCircle2 size={10} className="neon-text-green" /> Risk ✓</span>
+              <span className="flex items-center gap-1"><CheckCircle2 size={10} className="neon-text-green" /> Fraud ✓</span>
+              <span className="flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Payment</span>
             </div>
           </motion.div>
         )}

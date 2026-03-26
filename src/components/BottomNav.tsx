@@ -25,13 +25,20 @@ const BottomNav = ({ active, onNavigate }: BottomNavProps) => {
             <button
               key={tab.id}
               onClick={() => onNavigate(tab.id)}
-              className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 transition-all duration-300"
+              className={`relative flex flex-col items-center gap-0.5 px-3 py-1.5 transition-all duration-300 ${isDemo && !isActive ? "scale-110" : ""}`}
             >
               {isActive && (
                 <motion.div
                   layoutId="activeTab"
                   className={`absolute inset-0 rounded-xl ${isDemo ? 'gradient-accent' : 'gradient-primary'} opacity-15`}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              {isDemo && !isActive && (
+                <motion.div
+                  className="absolute inset-0 rounded-xl border border-accent/30"
+                  animate={{ boxShadow: ["0 0 8px hsl(145 80% 50% / 0.2)", "0 0 16px hsl(145 80% 50% / 0.4)", "0 0 8px hsl(145 80% 50% / 0.2)"] }}
+                  transition={{ duration: 2, repeat: Infinity }}
                 />
               )}
               <tab.icon
@@ -41,6 +48,8 @@ const BottomNav = ({ active, onNavigate }: BottomNavProps) => {
                     ? isDemo
                       ? "neon-text-green"
                       : "neon-text-purple"
+                    : isDemo
+                    ? "text-accent/70"
                     : "text-muted-foreground"
                 }`}
               />
@@ -50,6 +59,8 @@ const BottomNav = ({ active, onNavigate }: BottomNavProps) => {
                     ? isDemo
                       ? "neon-text-green"
                       : "neon-text-purple"
+                    : isDemo
+                    ? "text-accent/70"
                     : "text-muted-foreground"
                 }`}
               >

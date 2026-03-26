@@ -15,7 +15,8 @@ export interface Claim {
   amount: number;
   txnId: string;
   date: string;
-  status: "Credited" | "Pending" | "Rejected";
+  status: "Credited" | "Pending" | "Rejected" | "Flagged";
+  flagged?: boolean;
 }
 
 export interface WeatherData {
@@ -27,6 +28,7 @@ export interface WeatherData {
   aqi: number;
   windSpeed: number;
   city: string;
+  riskScore: number;
   riskLevel: "Low" | "Medium" | "High";
 }
 
@@ -37,6 +39,8 @@ const KEYS = {
   weather: "gigshield_weather",
   notifications: "gigshield_notifications_enabled",
   riskPreference: "gigshield_risk_preference",
+  lastClaimTime: "gigshield_last_claim_time",
+  riskScore: "gigshield_risk_score",
 };
 
 // User
@@ -79,6 +83,43 @@ export const addClaim = (claim: Omit<Claim, "id">) => {
   localStorage.setItem(KEYS.claims, JSON.stringify(claims));
 };
 
+// Fraud detection
+export interface FraudCheckResult {
+  passed: boolean;
+  reason?: string;
+}
+
+export const checkFraud = (riskScore: number): FraudCheckResult => {
+  const lastTime = localStorage.getItem(KEYS.lastClaimTime);
+  const now = Date.now();
+
+  // Check rapid claims (within 30 seconds)
+  if (lastTime && now - Number(lastTime) < 30000) {
+    return { passed: false, reason: "Multiple claims detected in quick succession. Please wait before filing another claim." };
+  }
+
+  // Check if no risk detected
+  if (riskScore < 10) {
+    return { passed: false, reason: "No significant risk detected in your area. Claim blocked." };
+  }
+
+  return { passed: true };
+};
+
+export const recordClaimTime = () => {
+  localStorage.setItem(KEYS.lastClaimTime, String(Date.now()));
+};
+
+// Risk Score
+export const getRiskScore = (): number => {
+  const val = localStorage.getItem(KEYS.riskScore);
+  return val ? Number(val) : 50;
+};
+
+export const setRiskScore = (val: number) => {
+  localStorage.setItem(KEYS.riskScore, String(val));
+};
+
 // Notifications
 export const getNotificationsEnabled = (): boolean => {
   const val = localStorage.getItem(KEYS.notifications);
@@ -96,6 +137,11 @@ export const getRiskPreference = (): "Low" | "Medium" | "High" => {
 
 export const setRiskPreference = (val: "Low" | "Medium" | "High") => {
   localStorage.setItem(KEYS.riskPreference, val);
+};
+
+// Dynamic premium calculation
+export const calcPremium = (basePrice: number, riskScore: number): number => {
+  return Math.round(basePrice + riskScore / 10);
 };
 
 // Export data
