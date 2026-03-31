@@ -3,6 +3,7 @@ import { CloudRain, Zap, TrendingDown, Loader2, ShieldAlert, AlertTriangle, Chec
 import { useState } from "react";
 import PaymentPopup from "../components/PaymentPopup";
 import { addClaim, checkFraud, recordClaimTime, getRiskScore } from "../lib/store";
+import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
