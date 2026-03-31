@@ -12,6 +12,7 @@ const DemoScreen = () => {
   const [fraudMsg, setFraudMsg] = useState("");
 
   const payout = Math.round(income * (lossPct / 100));
+  const animatedPayout = useAnimatedCounter(payout, 600);
   const riskScore = getRiskScore();
 
   const handleSimulate = () => {
