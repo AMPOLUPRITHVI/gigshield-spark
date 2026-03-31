@@ -145,28 +145,55 @@ const HomeScreen = () => {
         </button>
       </div>
 
+      {/* Detect Location Button */}
+      {!weather && !loadingWeather && (
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={loadWeather}
+          className="w-full glass-card-glow p-4 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-transform"
+        >
+          <MapPin size={16} className="neon-text-blue" />
+          <span className="text-sm font-semibold text-foreground">📍 Detect My Location</span>
+        </motion.button>
+      )}
+
+      {/* Loading State */}
+      {loadingWeather && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glass-card p-4 flex flex-col items-center justify-center gap-2"
+        >
+          <Loader2 size={20} className="animate-spin neon-text-purple" />
+          <span className="text-xs text-muted-foreground">Fetching weather for your location...</span>
+        </motion.div>
+      )}
+
       {/* Weather Strip */}
-      {weather && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MapPin size={14} className="text-muted-foreground" />
-            <span className="text-xs text-foreground font-medium">{weather.city}</span>
+      {weather && !loadingWeather && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin size={14} className="neon-text-blue" />
+              <span className="text-xs text-foreground font-semibold">{weather.city}</span>
+              {weather.rain && <span className="text-xs">🌧️</span>}
+              {!weather.rain && weather.temp > 38 && <span className="text-xs">🔥</span>}
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={loadWeather} disabled={loadingWeather} className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
+                <RefreshCw size={11} className={loadingWeather ? "animate-spin" : ""} />
+                <span>Update</span>
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><Thermometer size={12} />{weather.temp}°C</span>
             <span className="flex items-center gap-1"><Droplets size={12} />{weather.humidity}%</span>
             <span className="flex items-center gap-1"><Wind size={12} />{weather.windSpeed} m/s</span>
-            <button onClick={loadWeather} disabled={loadingWeather} className="p-1 rounded-lg hover:bg-muted/50 transition-colors">
-              <RefreshCw size={12} className={loadingWeather ? "animate-spin" : ""} />
-            </button>
+            <span className="flex items-center gap-1">AQI {weather.aqi}</span>
           </div>
         </motion.div>
-      )}
-      {loadingWeather && !weather && (
-        <div className="glass-card p-3 flex items-center justify-center gap-2">
-          <Loader2 size={14} className="animate-spin text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Detecting location & weather...</span>
-        </div>
       )}
 
       {/* Risk Score Gauge */}
