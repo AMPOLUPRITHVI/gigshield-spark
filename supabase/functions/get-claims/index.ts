@@ -1,5 +1,9 @@
-import { corsHeaders } from '@supabase/supabase-js/cors'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,7 +24,8 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: authData, error: authErr } = await supabase.auth.getClaims(authHeader.replace('Bearer ', ''))
+    const token = authHeader.replace('Bearer ', '')
+    const { data: authData, error: authErr } = await supabase.auth.getClaims(token)
     if (authErr || !authData?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -34,15 +39,13 @@ Deno.serve(async (req) => {
 
     if (error) throw error
 
-    // Admin stats
     const totalClaims = claims?.length || 0
     const totalPayouts = claims?.reduce((s, c) => s + Number(c.payout), 0) || 0
     const fraudAlerts = claims?.filter(c => c.flagged).length || 0
-    const avgRisk = totalClaims > 0 ? Math.round(totalPayouts / totalClaims) : 0
 
     return new Response(JSON.stringify({
       claims,
-      stats: { totalClaims, totalPayouts, fraudAlerts, avgRisk },
+      stats: { totalClaims, totalPayouts, fraudAlerts },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

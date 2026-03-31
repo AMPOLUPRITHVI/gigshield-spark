@@ -1,5 +1,9 @@
-import { corsHeaders } from '@supabase/supabase-js/cors'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,24 +24,23 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: claims, error: claimsErr } = await supabase.auth.getClaims(authHeader.replace('Bearer ', ''))
-    if (claimsErr || !claims?.claims) {
+    const token = authHeader.replace('Bearer ', '')
+    const { data: claimsAuth, error: authErr } = await supabase.auth.getClaims(token)
+    if (authErr || !claimsAuth?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    const userId = claims.claims.sub as string
+    const userId = claimsAuth.claims.sub as string
 
     const { income, lossPercentage, type, riskScore } = await req.json()
 
-    // Fraud check: no risk
     if (riskScore !== undefined && riskScore < 10) {
       return new Response(JSON.stringify({ error: 'No significant risk detected. Claim blocked.', fraudBlocked: true }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Fraud check: rapid claims (check last claim within 30s)
     const { data: recentClaims } = await supabase
       .from('claims')
       .select('created_at')
@@ -57,7 +60,6 @@ Deno.serve(async (req) => {
     const payout = Math.round(income * (lossPercentage / 100))
     const txnId = `TXN${Math.floor(100000 + Math.random() * 900000)}`
 
-    // Insert claim
     const { data: claim, error: insertErr } = await supabase.from('claims').insert({
       user_id: userId,
       type: type || 'Rain Claim',
@@ -70,7 +72,6 @@ Deno.serve(async (req) => {
 
     if (insertErr) throw insertErr
 
-    // Insert payment
     await supabase.from('payments').insert({
       user_id: userId,
       txn_id: txnId,
@@ -79,10 +80,7 @@ Deno.serve(async (req) => {
     })
 
     return new Response(JSON.stringify({
-      claimId: claim.id,
-      payout,
-      txnId,
-      timestamp: claim.created_at,
+      claimId: claim.id, payout, txnId, timestamp: claim.created_at,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

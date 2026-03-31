@@ -1,5 +1,9 @@
-import { corsHeaders } from '@supabase/supabase-js/cors'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,7 +24,8 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: authData, error: authErr } = await supabase.auth.getClaims(authHeader.replace('Bearer ', ''))
+    const token = authHeader.replace('Bearer ', '')
+    const { data: authData, error: authErr } = await supabase.auth.getClaims(token)
     if (authErr || !authData?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -31,7 +36,6 @@ Deno.serve(async (req) => {
     const { amount, planName } = await req.json()
     const txnId = `TXN${Math.floor(100000 + Math.random() * 900000)}`
 
-    // Save payment
     const { error: payErr } = await supabase.from('payments').insert({
       user_id: userId,
       txn_id: txnId,
@@ -40,7 +44,6 @@ Deno.serve(async (req) => {
     })
     if (payErr) throw payErr
 
-    // Update user plan if provided
     if (planName) {
       await supabase.from('profiles').update({
         plan: planName,
@@ -49,9 +52,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      status: 'Success',
-      txnId,
-      time: new Date().toISOString(),
+      status: 'Success', txnId, time: new Date().toISOString(),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
