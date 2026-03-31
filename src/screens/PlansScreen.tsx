@@ -1,14 +1,19 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Sparkles, Loader2, CheckCircle2, Gauge } from "lucide-react";
-import { useState } from "react";
-import { getUser, saveUser, getRiskScore, calcPremium } from "../lib/store";
+import { useState, useEffect } from "react";
+import { getProfile, updateProfile, getRiskScore, calcPremium, processPayment, type UserProfile } from "../lib/supabase-store";
 import PaymentPopup from "../components/PaymentPopup";
+import { toast } from "@/hooks/use-toast";
 
 const PlansScreen = () => {
   const [selected, setSelected] = useState(1);
   const [step, setStep] = useState<"idle" | "paying" | "success">("idle");
-  const user = getUser();
+  const [user, setUser] = useState<UserProfile | null>(null);
   const riskScore = getRiskScore();
+
+  useEffect(() => {
+    getProfile().then(setUser);
+  }, []);
 
   const plans = [
     { name: "Basic" as const, basePrice: 10, coverage: "₹300", features: ["Weather coverage", "Basic claims", "Email support"] },
@@ -20,16 +25,22 @@ const PlansScreen = () => {
     price: `₹${calcPremium(p.basePrice, riskScore)}/week`,
   }));
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     setStep("paying");
-    setTimeout(() => setStep("success"), 2000);
+    try {
+      const plan = plans[selected];
+      await processPayment(plan.amount, plan.name);
+      await updateProfile({ plan: plan.name, coverageActive: true });
+      setUser((prev) => prev ? { ...prev, plan: plan.name, coverageActive: true } : prev);
+      setStep("success");
+    } catch (error: any) {
+      toast({ title: "Payment failed", description: error.message, variant: "destructive" });
+      setStep("idle");
+    }
   };
 
   const handlePaymentDone = () => {
-    const plan = plans[selected];
-    if (user) {
-      saveUser({ ...user, plan: plan.name, coverageActive: true });
-    }
+    toast({ title: "Plan activated!", description: `You're now on the ${plans[selected].name} plan` });
     setStep("idle");
   };
 
@@ -43,19 +54,13 @@ const PlansScreen = () => {
         <p className="text-sm text-muted-foreground mt-1">AI-powered coverage for gig workers</p>
       </div>
 
-      {/* Dynamic pricing banner */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-3 flex items-center gap-3">
         <Gauge size={16} className={riskColor} />
         <div className="flex-1">
           <p className="text-xs text-muted-foreground">Prices adjusted by your risk score</p>
-          <p className="text-sm font-bold">
-            <span className={riskColor}>{riskScore}/100</span>
-            <span className="text-muted-foreground text-xs ml-2">({riskLabel} Risk)</span>
-          </p>
+          <p className="text-sm font-bold"><span className={riskColor}>{riskScore}/100</span><span className="text-muted-foreground text-xs ml-2">({riskLabel} Risk)</span></p>
         </div>
-        <div className="text-[10px] text-muted-foreground text-right">
-          <p>Formula: base + score/10</p>
-        </div>
+        <div className="text-[10px] text-muted-foreground text-right"><p>Formula: base + score/10</p></div>
       </motion.div>
 
       {user?.plan && user.plan !== "none" && (
@@ -67,54 +72,28 @@ const PlansScreen = () => {
 
       <div className="space-y-4">
         {plans.map((plan, i) => (
-          <motion.div
-            key={plan.name}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            onClick={() => setSelected(i)}
-            className={`relative cursor-pointer transition-all duration-300 p-5 rounded-2xl border ${
-              selected === i
-                ? "glass-card-glow border-primary/40"
-                : "glass-card border-white/5 hover:border-white/15"
-            }`}
-          >
+          <motion.div key={plan.name} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} onClick={() => setSelected(i)} className={`relative cursor-pointer transition-all duration-300 p-5 rounded-2xl border ${selected === i ? "glass-card-glow border-primary/40" : "glass-card border-white/5 hover:border-white/15"}`}>
             {plan.popular && (
-              <div className="absolute -top-2.5 right-4 gradient-accent text-accent-foreground text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                <Sparkles size={10} /> POPULAR
-              </div>
+              <div className="absolute -top-2.5 right-4 gradient-accent text-accent-foreground text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1"><Sparkles size={10} /> POPULAR</div>
             )}
-
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="font-bold text-foreground text-lg">{plan.name}</h3>
                 <p className="text-sm text-muted-foreground">{plan.price}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Base ₹{plan.basePrice} + ₹{Math.round(riskScore / 10)} risk
-                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Base ₹{plan.basePrice} + ₹{Math.round(riskScore / 10)} risk</p>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-extrabold neon-text-green">{plan.coverage}</p>
                 <p className="text-[10px] text-muted-foreground">coverage</p>
               </div>
             </div>
-
             <div className="space-y-2">
               {plan.features.map((f) => (
-                <div key={f} className="flex items-center gap-2 text-sm text-foreground/80">
-                  <Check size={14} className="neon-text-green" />
-                  {f}
-                </div>
+                <div key={f} className="flex items-center gap-2 text-sm text-foreground/80"><Check size={14} className="neon-text-green" />{f}</div>
               ))}
             </div>
-
             {selected === i && (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onClick={(e) => { e.stopPropagation(); handleSubscribe(); }}
-                className="btn-accent-glow w-full mt-4 text-sm flex items-center justify-center gap-2"
-              >
+              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={(e) => { e.stopPropagation(); handleSubscribe(); }} className="btn-accent-glow w-full mt-4 text-sm flex items-center justify-center gap-2">
                 {step === "paying" ? <Loader2 size={16} className="animate-spin" /> : null}
                 {step === "paying" ? "Processing..." : `Subscribe to ${plan.name} — ₹${plan.amount}`}
               </motion.button>
@@ -123,11 +102,7 @@ const PlansScreen = () => {
         ))}
       </div>
 
-      <PaymentPopup
-        open={step === "success"}
-        onClose={handlePaymentDone}
-        amount={plans[selected].amount}
-      />
+      <PaymentPopup open={step === "success"} onClose={handlePaymentDone} amount={plans[selected].amount} />
     </div>
   );
 };
