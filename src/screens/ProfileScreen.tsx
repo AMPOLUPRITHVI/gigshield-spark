@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { User, Shield, BarChart3, Settings, ChevronRight, Server, PieChart, Gauge } from "lucide-react";
 import { getUser, getClaims, exportData, getRiskScore } from "../lib/store";
+import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 
 interface ProfileScreenProps {
   onNavigate: (screen: string) => void;
@@ -12,6 +13,10 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const totalPayout = claims.reduce((s, c) => s + c.amount, 0);
   const flaggedClaims = claims.filter(c => c.flagged || c.status === "Flagged").length;
   const riskScore = getRiskScore();
+
+  const animatedClaims = useAnimatedCounter(claims.length, 800);
+  const animatedFlagged = useAnimatedCounter(flaggedClaims, 800);
+  const animatedPayout = useAnimatedCounter(totalPayout, 1200);
 
   const menuItems = [
     { icon: Shield, label: "Admin Dashboard", desc: "Claims, fraud alerts, analytics", target: "admin" },
@@ -45,12 +50,12 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
         </div>
       </motion.div>
 
-      {/* Stats */}
+      {/* Stats with animated counters */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Total Claims", value: String(claims.length) },
-          { label: "Fraud Alerts", value: String(flaggedClaims || 0) },
-          { label: "Payout", value: `₹${totalPayout >= 1000 ? `${(totalPayout / 1000).toFixed(1)}K` : totalPayout}` },
+          { label: "Total Claims", value: animatedClaims, format: (v: number) => String(v) },
+          { label: "Fraud Alerts", value: animatedFlagged, format: (v: number) => String(v) },
+          { label: "Payout", value: animatedPayout, format: (v: number) => `₹${v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v}` },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -59,7 +64,7 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
             transition={{ delay: i * 0.1 }}
             className="glass-card p-3 text-center"
           >
-            <p className="text-lg font-bold text-foreground">{stat.value}</p>
+            <p className="text-lg font-bold text-foreground">{stat.format(stat.value)}</p>
             <p className="text-[10px] text-muted-foreground">{stat.label}</p>
           </motion.div>
         ))}

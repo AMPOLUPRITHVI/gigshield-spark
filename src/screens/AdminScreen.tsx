@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Shield, AlertTriangle, TrendingUp, Users, BarChart3, Gauge } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { getClaims, getRiskScore } from "../lib/store";
+import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 
 const weeklyData = [
   { day: "Mon", claims: 4, fraud: 0 },
@@ -34,11 +35,16 @@ const AdminScreen = () => {
   const flaggedClaims = claims.filter(c => c.flagged || c.status === "Flagged").length;
   const riskScore = getRiskScore();
 
+  const animatedClaims = useAnimatedCounter(claims.length, 800);
+  const animatedFlagged = useAnimatedCounter(flaggedClaims || 2, 800);
+  const animatedPayout = useAnimatedCounter(totalPayout, 1200);
+  const animatedRisk = useAnimatedCounter(riskScore, 1000);
+
   const stats = [
-    { icon: BarChart3, label: "Total Claims", value: String(claims.length), accent: "neon-text-blue" },
-    { icon: AlertTriangle, label: "Fraud Alerts", value: String(flaggedClaims || 2), accent: "text-destructive" },
-    { icon: TrendingUp, label: "Total Payout", value: `₹${totalPayout.toLocaleString()}`, accent: "neon-text-green" },
-    { icon: Gauge, label: "Risk Score", value: `${riskScore}/100`, accent: riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green" },
+    { icon: BarChart3, label: "Total Claims", value: String(animatedClaims), accent: "neon-text-blue" },
+    { icon: AlertTriangle, label: "Fraud Alerts", value: String(animatedFlagged), accent: "text-destructive" },
+    { icon: TrendingUp, label: "Total Payout", value: `₹${animatedPayout.toLocaleString()}`, accent: "neon-text-green" },
+    { icon: Gauge, label: "Risk Score", value: `${animatedRisk}/100`, accent: riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green" },
   ];
 
   return (
