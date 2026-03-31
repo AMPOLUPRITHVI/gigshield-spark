@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { Shield, AlertTriangle, TrendingUp, Users, BarChart3, Gauge } from "lucide-react";
+import { Shield, AlertTriangle, TrendingUp, BarChart3, Gauge } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { getClaims, getRiskScore } from "../lib/store";
+import { useState, useEffect } from "react";
+import { fetchClaims, getRiskScore, type Claim } from "../lib/supabase-store";
 import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 
 const weeklyData = [
@@ -30,10 +31,15 @@ const riskDistribution = [
 ];
 
 const AdminScreen = () => {
-  const claims = getClaims();
-  const totalPayout = claims.reduce((s, c) => s + c.amount, 0);
-  const flaggedClaims = claims.filter(c => c.flagged || c.status === "Flagged").length;
+  const [claims, setClaims] = useState<Claim[]>([]);
   const riskScore = getRiskScore();
+
+  useEffect(() => {
+    fetchClaims().then(setClaims);
+  }, []);
+
+  const totalPayout = claims.reduce((s, c) => s + c.payout, 0);
+  const flaggedClaims = claims.filter(c => c.flagged).length;
 
   const animatedClaims = useAnimatedCounter(claims.length, 800);
   const animatedFlagged = useAnimatedCounter(flaggedClaims || 2, 800);
@@ -54,26 +60,16 @@ const AdminScreen = () => {
         <p className="text-sm text-muted-foreground mt-1">Claims, fraud & analytics</p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="glass-card-glow p-4 space-y-2"
-          >
-            <div className="p-2 rounded-xl gradient-primary w-fit">
-              <stat.icon size={16} className="text-foreground" />
-            </div>
+          <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="glass-card-glow p-4 space-y-2">
+            <div className="p-2 rounded-xl gradient-primary w-fit"><stat.icon size={16} className="text-foreground" /></div>
             <p className={`text-xl font-bold ${stat.accent}`}>{stat.value}</p>
             <p className="text-[10px] text-muted-foreground">{stat.label}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* Weekly Claims Chart */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Weekly Claims</p>
         <ResponsiveContainer width="100%" height={180}>
@@ -88,7 +84,6 @@ const AdminScreen = () => {
         </ResponsiveContainer>
       </motion.div>
 
-      {/* Monthly Trend */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Earnings Protected (Monthly)</p>
         <ResponsiveContainer width="100%" height={160}>
@@ -102,16 +97,13 @@ const AdminScreen = () => {
         </ResponsiveContainer>
       </motion.div>
 
-      {/* Risk Distribution */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Risk Distribution</p>
         <div className="flex items-center">
           <ResponsiveContainer width="50%" height={140}>
             <PieChart>
               <Pie data={riskDistribution} innerRadius={35} outerRadius={55} dataKey="value" paddingAngle={4}>
-                {riskDistribution.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
+                {riskDistribution.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
@@ -127,7 +119,6 @@ const AdminScreen = () => {
         </div>
       </motion.div>
 
-      {/* Fraud Alerts */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Shield size={16} className="text-destructive" />
@@ -144,11 +135,7 @@ const AdminScreen = () => {
               <p className="text-xs font-semibold text-foreground">{alert.desc}</p>
               <p className="text-[10px] text-muted-foreground">{alert.id} · {alert.time}</p>
             </div>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-              alert.severity === "High" ? "bg-destructive/20 text-destructive" :
-              alert.severity === "Medium" ? "bg-warning/20 text-warning" :
-              "bg-accent/20 neon-text-green"
-            }`}>{alert.severity}</span>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${alert.severity === "High" ? "bg-destructive/20 text-destructive" : alert.severity === "Medium" ? "bg-warning/20 text-warning" : "bg-accent/20 neon-text-green"}`}>{alert.severity}</span>
           </div>
         ))}
       </motion.div>

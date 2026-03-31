@@ -1,9 +1,18 @@
 import { motion } from "framer-motion";
 import { CloudRain, Sun, CheckCircle2, Download } from "lucide-react";
-import { getClaims, exportData } from "../lib/store";
+import { useState, useEffect } from "react";
+import { fetchClaims, exportData, type Claim } from "../lib/supabase-store";
 
 const HistoryScreen = () => {
-  const claims = getClaims();
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchClaims().then((data) => {
+      setClaims(data);
+      setLoading(false);
+    });
+  }, []);
 
   return (
     <div className="px-4 pt-4 pb-24 max-w-lg mx-auto space-y-5">
@@ -22,7 +31,11 @@ const HistoryScreen = () => {
         </div>
       </div>
 
-      {claims.length === 0 ? (
+      {loading ? (
+        <div className="glass-card p-8 text-center">
+          <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+        </div>
+      ) : claims.length === 0 ? (
         <div className="glass-card p-8 text-center">
           <p className="text-muted-foreground text-sm">No claims yet. Try the Demo!</p>
         </div>
@@ -45,7 +58,7 @@ const HistoryScreen = () => {
                 <p className="text-[10px] text-muted-foreground font-mono">{claim.txnId}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold neon-text-green text-sm">₹{claim.amount}</p>
+                <p className="font-bold neon-text-green text-sm">₹{claim.payout}</p>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                   <CheckCircle2 size={10} className="neon-text-green" />
                   {claim.status}

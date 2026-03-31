@@ -11,11 +11,34 @@ import LoginScreen from "../screens/LoginScreen";
 import AdminScreen from "../screens/AdminScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
 import SettingsScreen from "../screens/SettingsScreen";
-import { isLoggedIn } from "../lib/store";
+import { onAuthChange, getSession } from "../lib/supabase-store";
 
 const Index = () => {
-  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [active, setActive] = useState("home");
+
+  useEffect(() => {
+    // Set up auth listener BEFORE checking session
+    const subscription = onAuthChange((session) => {
+      setLoggedIn(!!session);
+    });
+
+    getSession().then((session) => {
+      setLoggedIn(!!session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  if (loggedIn === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   if (!loggedIn) {
     return <LoginScreen onLogin={() => setLoggedIn(true)} />;
@@ -39,10 +62,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated gradient background */}
       <div className="fixed inset-0 z-0 opacity-30 pointer-events-none animated-gradient" />
       <FloatingParticles />
-
       <div className="relative z-10">
         {["admin", "analytics", "settings"].includes(active) && (
           <button
