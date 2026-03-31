@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import BottomNav from "../components/BottomNav";
+import FloatingParticles from "../components/FloatingParticles";
 import HomeScreen from "../screens/HomeScreen";
 import PlansScreen from "../screens/PlansScreen";
 import DemoScreen from "../screens/DemoScreen";
@@ -37,27 +38,33 @@ const Index = () => {
   const showNav = !["admin", "analytics", "settings"].includes(active);
 
   return (
-    <div className="min-h-screen bg-background">
-      {["admin", "analytics", "settings"].includes(active) && (
-        <button
-          onClick={() => setActive("profile")}
-          className="fixed top-4 left-4 z-50 glass-card px-3 py-1.5 text-xs text-foreground rounded-lg"
-        >
-          ← Back
-        </button>
-      )}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={active}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2 }}
-        >
-          {renderScreen()}
-        </motion.div>
-      </AnimatePresence>
-      {showNav && <BottomNav active={active} onNavigate={setActive} />}
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Animated gradient background */}
+      <div className="fixed inset-0 z-0 opacity-30 pointer-events-none animated-gradient" />
+      <FloatingParticles />
+
+      <div className="relative z-10">
+        {["admin", "analytics", "settings"].includes(active) && (
+          <button
+            onClick={() => setActive("profile")}
+            className="fixed top-4 left-4 z-50 glass-card px-3 py-1.5 text-xs text-foreground rounded-lg"
+          >
+            ← Back
+          </button>
+        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderScreen()}
+          </motion.div>
+        </AnimatePresence>
+        {showNav && <BottomNav active={active} onNavigate={setActive} />}
+      </div>
     </div>
   );
 };
