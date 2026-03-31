@@ -1,5 +1,5 @@
-import { motion } from "framer-motion";
-import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets, Gauge, RefreshCw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets, Gauge, RefreshCw, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getUser, getRiskScore, setRiskScore } from "../lib/store";
 import { fetchWeather, getUserLocation, type WeatherResult } from "../lib/weather";
@@ -12,10 +12,11 @@ const riskColors = {
 
 const HomeScreen = () => {
   const user = getUser();
-  const [showNotif, setShowNotif] = useState(true);
+  const [showNotif, setShowNotif] = useState(false);
   const [weather, setWeather] = useState<WeatherResult | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
+  const [alerts, setAlerts] = useState<string[]>([]);
 
   const loadWeather = async () => {
     setLoadingWeather(true);
@@ -24,12 +25,28 @@ const HomeScreen = () => {
       const data = await fetchWeather(lat, lon);
       setWeather(data);
       setRiskScore(data.riskScore);
+      generateAlerts(data);
     } catch {
       const data = await fetchWeather(17.385, 78.4867);
       setWeather(data);
       setRiskScore(data.riskScore);
+      generateAlerts(data);
     } finally {
       setLoadingWeather(false);
+    }
+  };
+
+  const generateAlerts = (w: WeatherResult) => {
+    const a: string[] = [];
+    if (w.rain) a.push("🌧️ Rain detected in your area — coverage active");
+    if (w.temp > 38) a.push("🔥 Extreme heat warning — stay hydrated");
+    if (w.aqi > 150) a.push("😷 Poor air quality — limit outdoor activity");
+    if (w.windSpeed > 15) a.push("💨 High wind speeds detected");
+    if (w.riskScore >= 71) a.push("🚨 High risk zone — claim eligible");
+    if (a.length === 0) a.push("✅ No active weather alerts");
+    setAlerts(a);
+    if (a.length > 0 && a[0] !== "✅ No active weather alerts") {
+      setShowNotif(true);
     }
   };
 
@@ -37,7 +54,6 @@ const HomeScreen = () => {
     loadWeather();
   }, []);
 
-  // Animated counter for risk score
   useEffect(() => {
     if (!weather) return;
     const target = weather.riskScore;
@@ -77,6 +93,37 @@ const HomeScreen = () => {
 
   return (
     <div className="px-4 pt-4 pb-24 max-w-lg mx-auto space-y-5">
+      {/* Slide-down notification alerts */}
+      <AnimatePresence>
+        {showNotif && (
+          <motion.div
+            initial={{ opacity: 0, y: -60, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -60, height: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-0 left-0 right-0 z-[60] px-4 pt-3 pb-2 space-y-2"
+            style={{ background: "linear-gradient(180deg, hsl(var(--background)), transparent)" }}
+          >
+            {alerts.filter(a => !a.startsWith("✅")).map((alert, i) => (
+              <motion.div
+                key={alert}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="glass-card-glow p-3 flex items-center justify-between border-l-4 border-warning"
+              >
+                <p className="text-xs font-medium text-foreground">{alert}</p>
+                {i === 0 && (
+                  <button onClick={() => setShowNotif(false)} className="p-1 rounded-lg hover:bg-muted/50">
+                    <X size={14} className="text-muted-foreground" />
+                  </button>
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -88,8 +135,12 @@ const HomeScreen = () => {
           className="relative p-2 glass-card rounded-xl"
         >
           <Bell size={20} className="text-foreground" />
-          {showNotif && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
+          {alerts.some(a => !a.startsWith("✅")) && (
+            <motion.span
+              className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-destructive"
+              animate={{ scale: [1, 1.3, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
           )}
         </button>
       </div>
@@ -139,7 +190,6 @@ const HomeScreen = () => {
                 {riskLevel} Risk
               </span>
             </div>
-            {/* Mini circular gauge */}
             <div className="relative w-20 h-20">
               <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                 <path
@@ -175,17 +225,6 @@ const HomeScreen = () => {
               </div>
             ))}
           </div>
-        </motion.div>
-      )}
-
-      {/* Notification */}
-      {showNotif && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-3 border-l-4 border-warning"
-        >
-          <p className="text-sm text-warning font-medium">⚠️ {weather?.rain ? "High rain risk — stay safe" : "Weather alert active"}</p>
         </motion.div>
       )}
 
