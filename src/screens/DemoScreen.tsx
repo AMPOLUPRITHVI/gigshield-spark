@@ -3,6 +3,7 @@ import { CloudRain, Zap, TrendingDown, Loader2, ShieldAlert, AlertTriangle, Chec
 import { useState } from "react";
 import PaymentPopup from "../components/PaymentPopup";
 import { addClaim, checkFraud, recordClaimTime, getRiskScore } from "../lib/store";
+import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
@@ -11,6 +12,7 @@ const DemoScreen = () => {
   const [fraudMsg, setFraudMsg] = useState("");
 
   const payout = Math.round(income * (lossPct / 100));
+  const animatedPayout = useAnimatedCounter(payout, 600);
   const riskScore = getRiskScore();
 
   const handleSimulate = () => {
@@ -131,7 +133,7 @@ const DemoScreen = () => {
         <div className="h-px bg-white/10 my-1" />
         <div className="flex justify-between text-sm font-bold">
           <span className="text-foreground">Estimated Payout</span>
-          <span className="neon-text-green text-lg">₹{payout}</span>
+          <span className="neon-text-green text-lg">₹{animatedPayout}</span>
         </div>
       </div>
 

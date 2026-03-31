@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, X } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
+import confetti from "canvas-confetti";
 
 interface PaymentPopupProps {
   open: boolean;
@@ -21,6 +22,30 @@ const PaymentPopup = ({ open, onClose, amount }: PaymentPopupProps) => {
       minute: "2-digit",
       hour12: true,
     });
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      const end = Date.now() + 800;
+      const frame = () => {
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.7 },
+          colors: ["#22c55e", "#6366f1", "#3b82f6"],
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.7 },
+          colors: ["#22c55e", "#6366f1", "#3b82f6"],
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      };
+      frame();
+    }
   }, [open]);
 
   return (
@@ -76,6 +101,10 @@ const PaymentPopup = ({ open, onClose, amount }: PaymentPopupProps) => {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Time</span>
                 <span className="font-semibold text-foreground">{time}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Method</span>
+                <span className="font-semibold text-foreground">UPI</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Status</span>

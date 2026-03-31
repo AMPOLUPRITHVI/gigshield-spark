@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { User, Bell, Shield, LogOut, ChevronRight, X, MapPin } from "lucide-react";
+import { User, Bell, Shield, LogOut, ChevronRight, X, MapPin, Palette } from "lucide-react";
 import { useState } from "react";
 import { getUser, saveUser, getNotificationsEnabled, setNotificationsEnabled, getRiskPreference, setRiskPreference, logout } from "../lib/store";
+import ThemeToggle from "../components/ThemeToggle";
 
 interface SettingsScreenProps {
   onLogout: () => void;
@@ -91,6 +92,11 @@ const SettingsScreen = ({ onLogout, onBack }: SettingsScreenProps) => {
             <p className="text-xs">{user?.email}</p>
           </div>
         )}
+      </motion.div>
+
+      {/* Theme Toggle */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
+        <ThemeToggle />
       </motion.div>
 
       {/* Risk Preference */}
