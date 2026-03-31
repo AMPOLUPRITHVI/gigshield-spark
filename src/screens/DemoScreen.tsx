@@ -133,7 +133,7 @@ const DemoScreen = () => {
         <div className="h-px bg-white/10 my-1" />
         <div className="flex justify-between text-sm font-bold">
           <span className="text-foreground">Estimated Payout</span>
-          <span className="neon-text-green text-lg">₹{payout}</span>
+          <span className="neon-text-green text-lg">₹{animatedPayout}</span>
         </div>
       </div>
 
