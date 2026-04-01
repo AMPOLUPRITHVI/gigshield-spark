@@ -101,7 +101,14 @@ const DemoScreen = () => {
         <div className="flex justify-between text-sm font-bold"><span className="text-foreground">Estimated Payout</span><span className="neon-text-green text-lg">₹{animatedPayout}</span></div>
       </div>
 
-      <AnimatePresence mode="wait">
+      {/* Claim Timeline */}
+      {step !== "idle" && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4">
+          <p className="text-xs font-semibold text-foreground mb-3">🕒 Claim Progress</p>
+          <ClaimTimeline step={timelineStep} />
+        </motion.div>
+      )}
+
         {step === "idle" && (
           <motion.button key="btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleSimulate} className="btn-accent-glow w-full text-base pulse-glow flex items-center justify-center gap-2">
             <Zap size={18} /> Simulate Claim
