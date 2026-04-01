@@ -5,6 +5,7 @@ import PaymentPopup from "../components/PaymentPopup";
 import { getRiskScore, createClaim } from "../lib/supabase-store";
 import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 import { toast } from "@/hooks/use-toast";
+import ClaimTimeline from "@/components/ClaimTimeline";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
