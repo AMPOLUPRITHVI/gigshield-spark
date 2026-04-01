@@ -1,9 +1,13 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets, Gauge, RefreshCw, X } from "lucide-react";
-import { useState, useEffect } from "react";
-import { getRiskScore, setRiskScore } from "../lib/supabase-store";
-import { getProfile, type UserProfile } from "../lib/supabase-store";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getRiskScore, setRiskScore, createClaim, fetchClaims } from "../lib/supabase-store";
+import { getProfile, type UserProfile, type Claim } from "../lib/supabase-store";
 import { fetchWeather, getUserLocation, type WeatherResult } from "../lib/weather";
+import RiskMap from "@/components/RiskMap";
+import WalletCard from "@/components/WalletCard";
+import NotificationToast, { type AppNotification } from "@/components/NotificationToast";
+import { toast } from "@/hooks/use-toast";
 
 const riskColors = {
   Low: "neon-text-green",
@@ -18,24 +22,64 @@ const HomeScreen = () => {
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const autoClaimTriggered = useRef(false);
 
   useEffect(() => {
     getProfile().then(setUser);
+    fetchClaims().then(setClaims);
   }, []);
+
+  const addNotification = useCallback((message: string, type: AppNotification["type"]) => {
+    const notif: AppNotification = { id: crypto.randomUUID(), message, type, timestamp: Date.now() };
+    setNotifications((prev) => [notif, ...prev].slice(0, 5));
+    // Auto-dismiss after 5s
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
+    }, 5000);
+  }, []);
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const triggerAutoClaim = useCallback(async (weatherData: WeatherResult) => {
+    if (autoClaimTriggered.current) return;
+    if (!weatherData.rain && weatherData.riskScore < 71) return;
+
+    autoClaimTriggered.current = true;
+    const reason = weatherData.rain ? "Rain detected" : "High risk score";
+    addNotification(`⚠️ ${reason} → Auto-claim triggered`, "warning");
+
+    try {
+      const result = await createClaim(800, 50, "Auto Claim", weatherData.riskScore);
+      addNotification(`💰 ₹${result.payout} credited to your account`, "success");
+      toast({ title: "Auto Claim Processed!", description: `₹${result.payout} payout credited` });
+      fetchClaims().then(setClaims);
+    } catch (err: any) {
+      addNotification(`Claim blocked: ${err.message}`, "info");
+    }
+  }, [addNotification]);
 
   const loadWeather = async () => {
     setLoadingWeather(true);
     try {
-      const { lat, lon } = await getUserLocation();
-      const data = await fetchWeather(lat, lon);
+      const coords = await getUserLocation();
+      setUserCoords(coords);
+      const data = await fetchWeather(coords.lat, coords.lon);
       setWeather(data);
       setRiskScore(data.riskScore);
       generateAlerts(data);
+      triggerAutoClaim(data);
     } catch {
       const data = await fetchWeather(17.385, 78.4867);
+      setUserCoords({ lat: 17.385, lon: 78.4867 });
       setWeather(data);
       setRiskScore(data.riskScore);
       generateAlerts(data);
+      triggerAutoClaim(data);
     } finally {
       setLoadingWeather(false);
     }
@@ -50,6 +94,12 @@ const HomeScreen = () => {
     if (w.riskScore >= 71) a.push("🚨 High risk zone — claim eligible");
     if (a.length === 0) a.push("✅ No active weather alerts");
     setAlerts(a);
+
+    // Push notifications for hazards
+    a.filter((x) => !x.startsWith("✅")).forEach((msg) => {
+      addNotification(msg, "warning");
+    });
+
     if (a.length > 0 && a[0] !== "✅ No active weather alerts") {
       setShowNotif(true);
     }
@@ -76,14 +126,12 @@ const HomeScreen = () => {
 
   const riskLevel = weather?.riskLevel || "Medium";
   const riskScore = weather?.riskScore || getRiskScore();
-  const earningsProtected = user?.plan === "none" ? "₹0" : riskLevel === "High" ? "₹1,200" : riskLevel === "Medium" ? "₹800" : "₹400";
   const coverageActive = user?.plan !== "none";
 
   const scoreColor = riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green";
   const scoreBg = riskScore >= 71 ? "from-destructive/20 to-destructive/5" : riskScore >= 31 ? "from-warning/20 to-warning/5" : "from-accent/20 to-accent/5";
 
   const cards = [
-    { icon: TrendingUp, label: "Earnings Protected", value: earningsProtected, accent: "neon-text-blue" },
     { icon: Shield, label: "Active Coverage", value: coverageActive ? "ON" : "OFF", accent: coverageActive ? "neon-text-green" : "text-destructive" },
     { icon: AlertTriangle, label: "Risk Level", value: riskLevel, accent: riskColors[riskLevel] },
   ];
@@ -97,36 +145,8 @@ const HomeScreen = () => {
     : "☀️ Clear conditions today";
 
   return (
-    <div className="px-4 pt-4 pb-24 max-w-lg mx-auto space-y-5">
-      <AnimatePresence>
-        {showNotif && (
-          <motion.div
-            initial={{ opacity: 0, y: -60, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -60, height: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed top-0 left-0 right-0 z-[60] px-4 pt-3 pb-2 space-y-2"
-            style={{ background: "linear-gradient(180deg, hsl(var(--background)), transparent)" }}
-          >
-            {alerts.filter(a => !a.startsWith("✅")).map((alert, i) => (
-              <motion.div
-                key={alert}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="glass-card-glow p-3 flex items-center justify-between border-l-4 border-warning"
-              >
-                <p className="text-xs font-medium text-foreground">{alert}</p>
-                {i === 0 && (
-                  <button onClick={() => setShowNotif(false)} className="p-1 rounded-lg hover:bg-muted/50">
-                    <X size={14} className="text-muted-foreground" />
-                  </button>
-                )}
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="px-4 pt-4 pb-24 max-w-lg mx-auto space-y-4">
+      <NotificationToast notifications={notifications} onDismiss={dismissNotification} />
 
       <div className="flex items-center justify-between">
         <div>
@@ -162,7 +182,6 @@ const HomeScreen = () => {
               <MapPin size={14} className="neon-text-blue" />
               <span className="text-xs text-foreground font-semibold">{weather.city}</span>
               {weather.rain && <span className="text-xs">🌧️</span>}
-              {!weather.rain && weather.temp > 38 && <span className="text-xs">🔥</span>}
             </div>
             <button onClick={loadWeather} disabled={loadingWeather} className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted/50 transition-colors text-xs text-muted-foreground">
               <RefreshCw size={11} className={loadingWeather ? "animate-spin" : ""} />
@@ -176,6 +195,11 @@ const HomeScreen = () => {
             <span className="flex items-center gap-1">AQI {weather.aqi}</span>
           </div>
         </motion.div>
+      )}
+
+      {/* Live Risk Map */}
+      {weather && userCoords && (
+        <RiskMap lat={userCoords.lat} lon={userCoords.lon} riskLevel={riskLevel} riskScore={riskScore} />
       )}
 
       {weather && (
@@ -215,6 +239,9 @@ const HomeScreen = () => {
         </motion.div>
       )}
 
+      {/* Wallet */}
+      <WalletCard claims={claims} />
+
       <div className="space-y-3">
         {cards.map((card, i) => (
           <motion.div key={card.label} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="glass-card-glow p-4 flex items-center gap-4">
@@ -237,6 +264,14 @@ const HomeScreen = () => {
             <p className="text-xs text-foreground/80">{coverageActive ? "Your coverage is active ✅" : "Subscribe to activate coverage"}</p>
           </div>
         </div>
+      </motion.div>
+
+      {/* AI Explanation */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="glass-card p-3">
+        <p className="text-[10px] text-muted-foreground text-center">
+          🧠 Risk calculated using real-time weather, location data, and historical patterns. 
+          <span className="neon-text-blue ml-1 cursor-help" title="We combine rain probability (40%), temperature extremes (30%), air quality index (20%), and wind speed (10%) to compute your risk score.">How it works →</span>
+        </p>
       </motion.div>
     </div>
   );

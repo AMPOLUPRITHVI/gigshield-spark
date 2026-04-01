@@ -5,9 +5,11 @@ import PaymentPopup from "../components/PaymentPopup";
 import { getRiskScore, createClaim } from "../lib/supabase-store";
 import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 import { toast } from "@/hooks/use-toast";
+import ClaimTimeline from "@/components/ClaimTimeline";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
+  const [timelineStep, setTimelineStep] = useState(0);
   const [income, setIncome] = useState(800);
   const [lossPct, setLossPct] = useState(50);
   const [fraudMsg, setFraudMsg] = useState("");
@@ -19,16 +21,21 @@ const DemoScreen = () => {
 
   const handleSimulate = async () => {
     setStep("validating");
+    setTimelineStep(1);
 
     setTimeout(async () => {
+      setTimelineStep(2);
       try {
         setStep("loading");
+        setTimelineStep(3);
         const result = await createClaim(income, lossPct, "Rain Claim", riskScore);
         setClaimPayout(result.payout);
+        setTimelineStep(4);
         setTimeout(() => setStep("success"), 1500);
       } catch (error: any) {
         setFraudMsg(error.message || "Suspicious activity detected");
         setStep("fraud");
+        setTimelineStep(0);
       }
     }, 1200);
   };
@@ -36,6 +43,7 @@ const DemoScreen = () => {
   const handleClose = () => {
     toast({ title: "Claim processed!", description: `₹${claimPayout} credited to your account` });
     setStep("idle");
+    setTimelineStep(0);
   };
 
   return (
@@ -92,6 +100,14 @@ const DemoScreen = () => {
         <div className="h-px bg-white/10 my-1" />
         <div className="flex justify-between text-sm font-bold"><span className="text-foreground">Estimated Payout</span><span className="neon-text-green text-lg">₹{animatedPayout}</span></div>
       </div>
+
+      {/* Claim Timeline */}
+      {step !== "idle" && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4">
+          <p className="text-xs font-semibold text-foreground mb-3">🕒 Claim Progress</p>
+          <ClaimTimeline step={timelineStep} />
+        </motion.div>
+      )}
 
       <AnimatePresence mode="wait">
         {step === "idle" && (

@@ -1,4 +1,4 @@
-import { Home, CreditCard, Zap, ScrollText, User } from "lucide-react";
+import { Home, CreditCard, Zap, ScrollText, User, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface BottomNavProps {
