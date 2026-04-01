@@ -79,6 +79,12 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               <p className="text-muted-foreground mt-2 text-sm">AI-powered insurance for gig workers</p>
             </div>
             <div className="space-y-3">
+              <GoogleSignInButton onSuccess={onLogin} />
+              <div className="flex items-center gap-3 my-2">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-[10px] text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
               <button
                 onClick={() => setStep("login")}
                 className="glass-card-glow w-full p-4 flex items-center gap-4 text-left hover:border-primary/30 transition-all"
