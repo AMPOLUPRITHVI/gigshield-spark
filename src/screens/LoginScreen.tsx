@@ -3,6 +3,7 @@ import { Shield, Mail, ArrowRight, User, MapPin, Loader2, Lock } from "lucide-re
 import { useState } from "react";
 import { signUp, signIn } from "../lib/supabase-store";
 import { toast } from "@/hooks/use-toast";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 interface LoginScreenProps {
   onLogin: () => void;
