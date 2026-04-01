@@ -21,16 +21,21 @@ const DemoScreen = () => {
 
   const handleSimulate = async () => {
     setStep("validating");
+    setTimelineStep(1);
 
     setTimeout(async () => {
+      setTimelineStep(2);
       try {
         setStep("loading");
+        setTimelineStep(3);
         const result = await createClaim(income, lossPct, "Rain Claim", riskScore);
         setClaimPayout(result.payout);
+        setTimelineStep(4);
         setTimeout(() => setStep("success"), 1500);
       } catch (error: any) {
         setFraudMsg(error.message || "Suspicious activity detected");
         setStep("fraud");
+        setTimelineStep(0);
       }
     }, 1200);
   };
