@@ -109,6 +109,7 @@ const DemoScreen = () => {
         </motion.div>
       )}
 
+      <AnimatePresence mode="wait">
         {step === "idle" && (
           <motion.button key="btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleSimulate} className="btn-accent-glow w-full text-base pulse-glow flex items-center justify-center gap-2">
             <Zap size={18} /> Simulate Claim
