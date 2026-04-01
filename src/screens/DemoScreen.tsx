@@ -43,6 +43,7 @@ const DemoScreen = () => {
   const handleClose = () => {
     toast({ title: "Claim processed!", description: `₹${claimPayout} credited to your account` });
     setStep("idle");
+    setTimelineStep(0);
   };
 
   return (
