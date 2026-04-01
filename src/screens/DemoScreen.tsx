@@ -9,6 +9,7 @@ import ClaimTimeline from "@/components/ClaimTimeline";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
+  const [timelineStep, setTimelineStep] = useState(0);
   const [income, setIncome] = useState(800);
   const [lossPct, setLossPct] = useState(50);
   const [fraudMsg, setFraudMsg] = useState("");
