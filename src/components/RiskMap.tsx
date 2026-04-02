@@ -53,9 +53,9 @@ const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
       <div className="h-48 mt-2 rounded-b-xl overflow-hidden relative">
         <MapContainer
           center={[lat, lon]}
-          zoom={13}
-          scrollWheelZoom={false}
-          zoomControl={false}
+          zoom={15}
+          scrollWheelZoom={true}
+          zoomControl={true}
           attributionControl={false}
           style={{ height: "100%", width: "100%" }}
         >
