@@ -20,6 +20,11 @@ interface RiskMapProps {
   riskScore: number;
 }
 
+const TILES = {
+  dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+};
+
 const riskColors = {
   Low: "#22c55e",
   Medium: "#f59e0b",
