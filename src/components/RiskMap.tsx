@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Circle, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { motion } from "framer-motion";
-import { Map as MapIcon, LocateFixed } from "lucide-react";
+import { Map as MapIcon, LocateFixed, Sun, Moon } from "lucide-react";
 
 // Fix default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
