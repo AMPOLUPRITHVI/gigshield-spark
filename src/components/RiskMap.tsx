@@ -68,6 +68,7 @@ function LocateButton() {
 
 const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
   const color = riskColors[riskLevel];
+  const [tileMode, setTileMode] = useState<"dark" | "light">("dark");
 
   return (
     <motion.div
@@ -91,12 +92,19 @@ const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
           attributionControl={false}
           style={{ height: "100%", width: "100%" }}
         >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+          <TileLayer key={tileMode} url={TILES[tileMode]} />
           <MapUpdater lat={lat} lon={lon} />
           <Circle center={[lat, lon]} radius={2000} pathOptions={{ color, fillColor: color, fillOpacity: 0.15, weight: 1 }} />
           <Circle center={[lat, lon]} radius={500} pathOptions={{ color, fillColor: color, fillOpacity: 0.3, weight: 2 }} />
           <LocateButton />
         </MapContainer>
+        <button
+          onClick={() => setTileMode(tileMode === "dark" ? "light" : "dark")}
+          className="absolute top-2 right-12 z-[1000] glass-card p-2 rounded-lg hover:bg-white/10 transition-colors"
+          title={tileMode === "dark" ? "Switch to light map" : "Switch to dark map"}
+        >
+          {tileMode === "dark" ? <Sun size={16} className="text-foreground" /> : <Moon size={16} className="text-foreground" />}
+        </button>
         <div className="absolute bottom-2 left-2 z-[1000] glass-card px-2 py-1 text-[10px] text-muted-foreground">
           Risk zones based on real-time weather
         </div>
