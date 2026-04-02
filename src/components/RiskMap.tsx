@@ -29,7 +29,7 @@ const riskColors = {
 function PulsingMarker({ lat, lon }: { lat: number; lon: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lon], 13);
+    map.setView([lat, lon], 15);
   }, [lat, lon, map]);
   return <Marker position={[lat, lon]} />;
 }
