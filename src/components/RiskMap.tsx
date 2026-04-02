@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MapContainer, TileLayer, Circle, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { motion } from "framer-motion";
-import { Map as MapIcon } from "lucide-react";
+import { Map as MapIcon, LocateFixed } from "lucide-react";
 
 // Fix default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -26,12 +26,39 @@ const riskColors = {
   High: "#ef4444",
 };
 
-function PulsingMarker({ lat, lon }: { lat: number; lon: number }) {
+function MapUpdater({ lat, lon }: { lat: number; lon: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lon], 15);
+    map.setView([lat, lon], map.getZoom());
   }, [lat, lon, map]);
   return <Marker position={[lat, lon]} />;
+}
+
+function LocateButton() {
+  const map = useMap();
+  const [locating, setLocating] = useState(false);
+
+  const handleLocate = useCallback(() => {
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 16, { duration: 1.2 });
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { timeout: 10000 }
+    );
+  }, [map]);
+
+  return (
+    <button
+      onClick={handleLocate}
+      className="absolute top-2 right-2 z-[1000] glass-card p-2 rounded-lg hover:bg-white/10 transition-colors"
+      title="Center on my location"
+    >
+      <LocateFixed size={16} className={`text-foreground ${locating ? "animate-pulse" : ""}`} />
+    </button>
+  );
 }
 
 const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
@@ -50,7 +77,7 @@ const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
           {riskLevel} Risk Zone
         </span>
       </div>
-      <div className="h-48 mt-2 rounded-b-xl overflow-hidden relative">
+      <div className="h-72 mt-2 rounded-b-xl overflow-hidden relative">
         <MapContainer
           center={[lat, lon]}
           zoom={15}
@@ -60,9 +87,10 @@ const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-          <PulsingMarker lat={lat} lon={lon} />
+          <MapUpdater lat={lat} lon={lon} />
           <Circle center={[lat, lon]} radius={2000} pathOptions={{ color, fillColor: color, fillOpacity: 0.15, weight: 1 }} />
           <Circle center={[lat, lon]} radius={500} pathOptions={{ color, fillColor: color, fillOpacity: 0.3, weight: 2 }} />
+          <LocateButton />
         </MapContainer>
         <div className="absolute bottom-2 left-2 z-[1000] glass-card px-2 py-1 text-[10px] text-muted-foreground">
           Risk zones based on real-time weather
