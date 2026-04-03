@@ -32,6 +32,18 @@ const AnalyticsScreen = () => {
     load();
   }, []);
 
+  // Rain prediction notification
+  useEffect(() => {
+    if (rainAlertShown.current || forecast.length < 2) return;
+    const tomorrow = forecast[1];
+    if (tomorrow && tomorrow.rainProbability >= 60) {
+      rainAlertShown.current = true;
+      const msg = `🌧️ ${tomorrow.rainProbability}% rain probability tomorrow — auto-claim may trigger!`;
+      setRainAlert(msg);
+      toast({ title: "Rain Alert", description: msg, variant: "destructive" });
+    }
+  }, [forecast]);
+
   const totalPayout = claims.reduce((s, c) => s + c.payout, 0);
   const tomorrow = forecast[1];
 
