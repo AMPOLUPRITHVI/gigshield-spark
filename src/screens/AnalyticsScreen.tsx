@@ -47,6 +47,34 @@ const AnalyticsScreen = () => {
   const totalPayout = claims.reduce((s, c) => s + c.payout, 0);
   const tomorrow = forecast[1];
 
+  // Monthly summary data
+  const now = new Date();
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const monthClaims = claims.filter((c) => {
+      const cd = new Date(c.date);
+      return cd.getMonth() === d.getMonth() && cd.getFullYear() === d.getFullYear();
+    });
+    return {
+      month: d.toLocaleDateString("en", { month: "short" }),
+      claims: monthClaims.length,
+      payout: monthClaims.reduce((s, c) => s + c.payout, 0),
+    };
+  });
+
+  const thisMonthClaims = claims.filter((c) => {
+    const cd = new Date(c.date);
+    return cd.getMonth() === now.getMonth() && cd.getFullYear() === now.getFullYear();
+  });
+  const thisMonthPayout = thisMonthClaims.reduce((s, c) => s + c.payout, 0);
+  const lastMonthClaims = claims.filter((c) => {
+    const cd = new Date(c.date);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return cd.getMonth() === lastMonth.getMonth() && cd.getFullYear() === lastMonth.getFullYear();
+  });
+  const lastMonthPayout = lastMonthClaims.reduce((s, c) => s + c.payout, 0);
+  const payoutChange = lastMonthPayout > 0 ? Math.round(((thisMonthPayout - lastMonthPayout) / lastMonthPayout) * 100) : thisMonthPayout > 0 ? 100 : 0;
+
   const metrics = [
     { icon: TrendingUp, label: "Total Protected", value: `₹${(totalPayout * 3).toLocaleString()}`, sub: "All time", accent: "neon-text-green" },
     { icon: Shield, label: "Total Claims", value: String(claims.length), sub: "Processed", accent: "neon-text-blue" },
