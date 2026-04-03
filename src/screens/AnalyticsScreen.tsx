@@ -1,10 +1,11 @@
-import { motion } from "framer-motion";
-import { TrendingUp, Shield, Zap, CloudRain, Download, Loader2, Thermometer } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TrendingUp, Shield, Zap, CloudRain, Download, Loader2, Thermometer, Calendar, Bell, X, BarChart3 } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from "recharts";
+import { useState, useEffect, useRef } from "react";
 import { fetchClaims, exportData, type Claim } from "../lib/supabase-store";
 import { fetchForecast, type DailyForecast } from "../lib/forecast";
 import { getUserLocation } from "../lib/weather";
+import { toast } from "@/hooks/use-toast";
 
 const AnalyticsScreen = () => {
   const [claims, setClaims] = useState<Claim[]>([]);
