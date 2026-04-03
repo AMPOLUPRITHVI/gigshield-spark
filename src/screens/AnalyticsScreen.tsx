@@ -292,6 +292,67 @@ const AnalyticsScreen = () => {
         ))}
       </motion.div>
 
+      {/* Monthly Summary Dashboard */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="glass-card-glow p-4 space-y-4"
+      >
+        <div className="flex items-center gap-2">
+          <Calendar size={16} className="neon-text-purple" />
+          <span className="text-sm font-semibold text-foreground">Monthly Summary</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="glass-card p-3 rounded-xl text-center">
+            <p className="text-[10px] text-muted-foreground">This Month</p>
+            <p className="text-lg font-bold neon-text-green">₹{thisMonthPayout.toLocaleString()}</p>
+            <p className="text-[9px] text-muted-foreground">{thisMonthClaims.length} claims</p>
+          </div>
+          <div className="glass-card p-3 rounded-xl text-center">
+            <p className="text-[10px] text-muted-foreground">Last Month</p>
+            <p className="text-lg font-bold neon-text-blue">₹{lastMonthPayout.toLocaleString()}</p>
+            <p className="text-[9px] text-muted-foreground">{lastMonthClaims.length} claims</p>
+          </div>
+          <div className="glass-card p-3 rounded-xl text-center">
+            <p className="text-[10px] text-muted-foreground">Change</p>
+            <p className={`text-lg font-bold ${payoutChange >= 0 ? "neon-text-green" : "text-destructive"}`}>
+              {payoutChange >= 0 ? "+" : ""}{payoutChange}%
+            </p>
+            <p className="text-[9px] text-muted-foreground">vs last month</p>
+          </div>
+        </div>
+
+        {/* 6-Month Payout Trend */}
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={monthlyData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 20%, 18%)" />
+            <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
+            <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
+            <Tooltip
+              contentStyle={{
+                background: "hsl(230, 25%, 11%)",
+                border: "1px solid hsl(230, 20%, 18%)",
+                borderRadius: "12px",
+                color: "hsl(210, 40%, 98%)",
+              }}
+              formatter={(value: number, name: string) => [
+                name === "payout" ? `₹${value.toLocaleString()}` : value,
+                name === "payout" ? "Payout" : "Claims"
+              ]}
+            />
+            <Bar dataKey="payout" fill="hsl(145, 80%, 50%)" radius={[4, 4, 0, 0]} name="payout" />
+            <Bar dataKey="claims" fill="hsl(217, 91%, 60%)" radius={[4, 4, 0, 0]} name="claims" />
+          </BarChart>
+        </ResponsiveContainer>
+
+        {/* Claim Frequency */}
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground justify-center">
+          <BarChart3 size={12} />
+          <span>Avg {(claims.length / 6).toFixed(1)} claims/month over 6 months</span>
+        </div>
+      </motion.div>
+
       {/* Weekly Report Download */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
