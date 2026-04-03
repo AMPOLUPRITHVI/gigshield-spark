@@ -1,15 +1,18 @@
-import { motion } from "framer-motion";
-import { TrendingUp, Shield, Zap, CloudRain, Download, Loader2, Thermometer } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TrendingUp, Shield, Zap, CloudRain, Download, Loader2, Thermometer, Calendar, Bell, X, BarChart3 } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from "recharts";
+import { useState, useEffect, useRef } from "react";
 import { fetchClaims, exportData, type Claim } from "../lib/supabase-store";
 import { fetchForecast, type DailyForecast } from "../lib/forecast";
 import { getUserLocation } from "../lib/weather";
+import { toast } from "@/hooks/use-toast";
 
 const AnalyticsScreen = () => {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [forecast, setForecast] = useState<DailyForecast[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rainAlert, setRainAlert] = useState<string | null>(null);
+  const rainAlertShown = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -29,8 +32,48 @@ const AnalyticsScreen = () => {
     load();
   }, []);
 
+  // Rain prediction notification
+  useEffect(() => {
+    if (rainAlertShown.current || forecast.length < 2) return;
+    const tomorrow = forecast[1];
+    if (tomorrow && tomorrow.rainProbability >= 60) {
+      rainAlertShown.current = true;
+      const msg = `🌧️ ${tomorrow.rainProbability}% rain probability tomorrow — auto-claim may trigger!`;
+      setRainAlert(msg);
+      toast({ title: "Rain Alert", description: msg, variant: "destructive" });
+    }
+  }, [forecast]);
+
   const totalPayout = claims.reduce((s, c) => s + c.payout, 0);
   const tomorrow = forecast[1];
+
+  // Monthly summary data
+  const now = new Date();
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const monthClaims = claims.filter((c) => {
+      const cd = new Date(c.date);
+      return cd.getMonth() === d.getMonth() && cd.getFullYear() === d.getFullYear();
+    });
+    return {
+      month: d.toLocaleDateString("en", { month: "short" }),
+      claims: monthClaims.length,
+      payout: monthClaims.reduce((s, c) => s + c.payout, 0),
+    };
+  });
+
+  const thisMonthClaims = claims.filter((c) => {
+    const cd = new Date(c.date);
+    return cd.getMonth() === now.getMonth() && cd.getFullYear() === now.getFullYear();
+  });
+  const thisMonthPayout = thisMonthClaims.reduce((s, c) => s + c.payout, 0);
+  const lastMonthClaims = claims.filter((c) => {
+    const cd = new Date(c.date);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return cd.getMonth() === lastMonth.getMonth() && cd.getFullYear() === lastMonth.getFullYear();
+  });
+  const lastMonthPayout = lastMonthClaims.reduce((s, c) => s + c.payout, 0);
+  const payoutChange = lastMonthPayout > 0 ? Math.round(((thisMonthPayout - lastMonthPayout) / lastMonthPayout) * 100) : thisMonthPayout > 0 ? 100 : 0;
 
   const metrics = [
     { icon: TrendingUp, label: "Total Protected", value: `₹${(totalPayout * 3).toLocaleString()}`, sub: "All time", accent: "neon-text-green" },
@@ -63,6 +106,24 @@ const AnalyticsScreen = () => {
         <h2 className="text-xl font-bold text-foreground">Analytics</h2>
         <p className="text-sm text-muted-foreground mt-1">Performance, predictions & reports</p>
       </div>
+
+      {/* Rain Prediction Alert */}
+      <AnimatePresence>
+        {rainAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            className="glass-card-glow border border-destructive/30 p-3 flex items-center gap-3"
+          >
+            <Bell size={16} className="text-destructive shrink-0" />
+            <p className="text-xs text-foreground flex-1">{rainAlert}</p>
+            <button onClick={() => setRainAlert(null)} className="text-muted-foreground hover:text-foreground">
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Tomorrow's Prediction */}
       {tomorrow && (
@@ -229,6 +290,67 @@ const AnalyticsScreen = () => {
             </div>
           </div>
         ))}
+      </motion.div>
+
+      {/* Monthly Summary Dashboard */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="glass-card-glow p-4 space-y-4"
+      >
+        <div className="flex items-center gap-2">
+          <Calendar size={16} className="neon-text-purple" />
+          <span className="text-sm font-semibold text-foreground">Monthly Summary</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="glass-card p-3 rounded-xl text-center">
+            <p className="text-[10px] text-muted-foreground">This Month</p>
+            <p className="text-lg font-bold neon-text-green">₹{thisMonthPayout.toLocaleString()}</p>
+            <p className="text-[9px] text-muted-foreground">{thisMonthClaims.length} claims</p>
+          </div>
+          <div className="glass-card p-3 rounded-xl text-center">
+            <p className="text-[10px] text-muted-foreground">Last Month</p>
+            <p className="text-lg font-bold neon-text-blue">₹{lastMonthPayout.toLocaleString()}</p>
+            <p className="text-[9px] text-muted-foreground">{lastMonthClaims.length} claims</p>
+          </div>
+          <div className="glass-card p-3 rounded-xl text-center">
+            <p className="text-[10px] text-muted-foreground">Change</p>
+            <p className={`text-lg font-bold ${payoutChange >= 0 ? "neon-text-green" : "text-destructive"}`}>
+              {payoutChange >= 0 ? "+" : ""}{payoutChange}%
+            </p>
+            <p className="text-[9px] text-muted-foreground">vs last month</p>
+          </div>
+        </div>
+
+        {/* 6-Month Payout Trend */}
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={monthlyData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(230, 20%, 18%)" />
+            <XAxis dataKey="month" tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
+            <YAxis tick={{ fill: "hsl(215, 20%, 55%)", fontSize: 11 }} axisLine={false} />
+            <Tooltip
+              contentStyle={{
+                background: "hsl(230, 25%, 11%)",
+                border: "1px solid hsl(230, 20%, 18%)",
+                borderRadius: "12px",
+                color: "hsl(210, 40%, 98%)",
+              }}
+              formatter={(value: number, name: string) => [
+                name === "payout" ? `₹${value.toLocaleString()}` : value,
+                name === "payout" ? "Payout" : "Claims"
+              ]}
+            />
+            <Bar dataKey="payout" fill="hsl(145, 80%, 50%)" radius={[4, 4, 0, 0]} name="payout" />
+            <Bar dataKey="claims" fill="hsl(217, 91%, 60%)" radius={[4, 4, 0, 0]} name="claims" />
+          </BarChart>
+        </ResponsiveContainer>
+
+        {/* Claim Frequency */}
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground justify-center">
+          <BarChart3 size={12} />
+          <span>Avg {(claims.length / 6).toFixed(1)} claims/month over 6 months</span>
+        </div>
       </motion.div>
 
       {/* Weekly Report Download */}
