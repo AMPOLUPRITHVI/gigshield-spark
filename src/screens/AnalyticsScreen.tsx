@@ -11,6 +11,8 @@ const AnalyticsScreen = () => {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [forecast, setForecast] = useState<DailyForecast[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rainAlert, setRainAlert] = useState<string | null>(null);
+  const rainAlertShown = useRef(false);
 
   useEffect(() => {
     const load = async () => {
