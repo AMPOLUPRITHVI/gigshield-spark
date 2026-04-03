@@ -107,6 +107,24 @@ const AnalyticsScreen = () => {
         <p className="text-sm text-muted-foreground mt-1">Performance, predictions & reports</p>
       </div>
 
+      {/* Rain Prediction Alert */}
+      <AnimatePresence>
+        {rainAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            className="glass-card-glow border border-destructive/30 p-3 flex items-center gap-3"
+          >
+            <Bell size={16} className="text-destructive shrink-0" />
+            <p className="text-xs text-foreground flex-1">{rainAlert}</p>
+            <button onClick={() => setRainAlert(null)} className="text-muted-foreground hover:text-foreground">
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Tomorrow's Prediction */}
       {tomorrow && (
         <motion.div
