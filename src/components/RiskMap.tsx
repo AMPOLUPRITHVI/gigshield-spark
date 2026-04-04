@@ -106,7 +106,7 @@ const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer key={tileMode} url={TILES[tileMode]} />
-          <MapUpdater lat={lat} lon={lon} />
+          <MapUpdater lat={lat} lon={lon} color={color} />
           <Circle center={[lat, lon]} radius={2000} pathOptions={{ color, fillColor: color, fillOpacity: 0.15, weight: 1 }} />
           <Circle center={[lat, lon]} radius={500} pathOptions={{ color, fillColor: color, fillOpacity: 0.3, weight: 2 }} />
           <LocateButton />
