@@ -31,12 +31,25 @@ const riskColors = {
   High: "#ef4444",
 };
 
-function MapUpdater({ lat, lon }: { lat: number; lon: number }) {
+function MapUpdater({ lat, lon, color }: { lat: number; lon: number; color: string }) {
   const map = useMap();
   useEffect(() => {
     map.setView([lat, lon], map.getZoom());
   }, [lat, lon, map]);
-  return <Marker position={[lat, lon]} />;
+
+  // Pulsing marker with custom icon
+  const pulsingIcon = L.divIcon({
+    className: "",
+    html: `<div style="position:relative;width:24px;height:24px;">
+      <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.3;animation:pulse-ring 1.5s ease-out infinite;"></div>
+      <div style="position:absolute;top:4px;left:4px;width:16px;height:16px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 0 8px ${color};"></div>
+    </div>
+    <style>@keyframes pulse-ring{0%{transform:scale(1);opacity:0.4}100%{transform:scale(2.5);opacity:0}}</style>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+
+  return <Marker position={[lat, lon]} icon={pulsingIcon} />;
 }
 
 function LocateButton() {
@@ -93,7 +106,7 @@ const RiskMap = ({ lat, lon, riskLevel, riskScore }: RiskMapProps) => {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer key={tileMode} url={TILES[tileMode]} />
-          <MapUpdater lat={lat} lon={lon} />
+          <MapUpdater lat={lat} lon={lon} color={color} />
           <Circle center={[lat, lon]} radius={2000} pathOptions={{ color, fillColor: color, fillOpacity: 0.15, weight: 1 }} />
           <Circle center={[lat, lon]} radius={500} pathOptions={{ color, fillColor: color, fillOpacity: 0.3, weight: 2 }} />
           <LocateButton />
