@@ -1,9 +1,19 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets, Gauge, RefreshCw, X } from "lucide-react";
+import { Shield, TrendingUp, AlertTriangle, CloudRain, Bell, MapPin, Loader2, Thermometer, Wind, Droplets, Gauge, RefreshCw, X, DollarSign, BarChart3, Zap } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getRiskScore, setRiskScore, createClaim, fetchClaims } from "../lib/supabase-store";
 import { getProfile, type UserProfile, type Claim } from "../lib/supabase-store";
 import { fetchWeather, getUserLocation, type WeatherResult } from "../lib/weather";
+import {
+  getAverageIncome,
+  getLast7DaysIncome,
+  processSystem,
+  getDynamicPremium,
+  detectTriggers,
+  validateIncome,
+  addDailyIncome,
+  type SystemResult,
+} from "../lib/income-tracker";
 import RiskMap from "@/components/RiskMap";
 import WalletCard from "@/components/WalletCard";
 import NotificationToast, { type AppNotification } from "@/components/NotificationToast";
@@ -25,6 +35,8 @@ const HomeScreen = () => {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [userCoords, setUserCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [systemResult, setSystemResult] = useState<SystemResult | null>(null);
+  const [fraudAlert, setFraudAlert] = useState<string | null>(null);
   const autoClaimTriggered = useRef(false);
 
   useEffect(() => {
@@ -35,7 +47,6 @@ const HomeScreen = () => {
   const addNotification = useCallback((message: string, type: AppNotification["type"]) => {
     const notif: AppNotification = { id: crypto.randomUUID(), message, type, timestamp: Date.now() };
     setNotifications((prev) => [notif, ...prev].slice(0, 5));
-    // Auto-dismiss after 5s
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
     }, 5000);
@@ -45,23 +56,60 @@ const HomeScreen = () => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
-  const triggerAutoClaim = useCallback(async (weatherData: WeatherResult) => {
-    if (autoClaimTriggered.current) return;
-    if (!weatherData.rain && weatherData.riskScore < 71) return;
+  const runAutomatedSystem = useCallback(
+    async (weatherData: WeatherResult) => {
+      // Run the full processSystem flow
+      const avgIncome = getAverageIncome();
+      const enteredIncome = avgIncome || 500;
+      const result = processSystem(
+        {
+          rain: weatherData.rain,
+          temp: weatherData.temp,
+          aqi: weatherData.aqi,
+          humidity: weatherData.humidity,
+          windSpeed: weatherData.windSpeed,
+        },
+        enteredIncome,
+        weatherData.riskScore
+      );
+      setSystemResult(result);
 
-    autoClaimTriggered.current = true;
-    const reason = weatherData.rain ? "Rain detected" : "High risk score";
-    addNotification(`⚠️ ${reason} → Auto-claim triggered`, "warning");
+      // Check income validation
+      if (result.incomeValidation.suspicious) {
+        setFraudAlert(result.incomeValidation.message || null);
+      } else {
+        setFraudAlert(null);
+      }
 
-    try {
-      const result = await createClaim(800, 50, "Auto Claim", weatherData.riskScore);
-      addNotification(`💰 ₹${result.payout} credited to your account`, "success");
-      toast({ title: "Auto Claim Processed!", description: `₹${result.payout} payout credited` });
-      fetchClaims().then(setClaims);
-    } catch (err: any) {
-      addNotification(`Claim blocked: ${err.message}`, "info");
-    }
-  }, [addNotification]);
+      // Premium notification
+      addNotification(`💰 Premium updated: ₹${result.premium.amount}/day (${result.premium.label})`, "info");
+
+      // Auto-claim if triggered
+      if (result.trigger.triggered && !autoClaimTriggered.current) {
+        autoClaimTriggered.current = true;
+        result.trigger.reasons.forEach((r) => addNotification(`⚠️ ${r}`, "warning"));
+        addNotification("⚡ Auto-claim triggered", "warning");
+
+        try {
+          const claimResult = await createClaim(
+            result.avgIncome,
+            50,
+            result.trigger.type || "Auto Claim",
+            weatherData.riskScore
+          );
+          addNotification(`💰 ₹${claimResult.payout} credited automatically`, "success");
+          toast({
+            title: "Auto Claim Processed!",
+            description: `₹${claimResult.payout} credited based on ${result.trigger.type}`,
+          });
+          fetchClaims().then(setClaims);
+        } catch (err: any) {
+          addNotification(`Claim blocked: ${err.message}`, "info");
+        }
+      }
+    },
+    [addNotification]
+  );
 
   const loadWeather = async () => {
     setLoadingWeather(true);
@@ -72,14 +120,15 @@ const HomeScreen = () => {
       setWeather(data);
       setRiskScore(data.riskScore);
       generateAlerts(data);
-      triggerAutoClaim(data);
+      runAutomatedSystem(data);
     } catch {
       const data = await fetchWeather(17.385, 78.4867);
       setUserCoords({ lat: 17.385, lon: 78.4867 });
       setWeather(data);
       setRiskScore(data.riskScore);
       generateAlerts(data);
-      triggerAutoClaim(data);
+      addNotification("📍 Using default location", "info");
+      runAutomatedSystem(data);
     } finally {
       setLoadingWeather(false);
     }
@@ -95,7 +144,6 @@ const HomeScreen = () => {
     if (a.length === 0) a.push("✅ No active weather alerts");
     setAlerts(a);
 
-    // Push notifications for hazards
     a.filter((x) => !x.startsWith("✅")).forEach((msg) => {
       addNotification(msg, "warning");
     });
@@ -127,6 +175,9 @@ const HomeScreen = () => {
   const riskLevel = weather?.riskLevel || "Medium";
   const riskScore = weather?.riskScore || getRiskScore();
   const coverageActive = user?.plan !== "none";
+  const premium = getDynamicPremium(riskScore);
+  const incomeHistory = getLast7DaysIncome();
+  const avgIncome = getAverageIncome();
 
   const scoreColor = riskScore >= 71 ? "text-destructive" : riskScore >= 31 ? "text-warning" : "neon-text-green";
   const scoreBg = riskScore >= 71 ? "from-destructive/20 to-destructive/5" : riskScore >= 31 ? "from-warning/20 to-warning/5" : "from-accent/20 to-accent/5";
@@ -144,6 +195,9 @@ const HomeScreen = () => {
     ? "😷 Poor air quality detected"
     : "☀️ Clear conditions today";
 
+  // Income chart bar max
+  const maxIncome = Math.max(...incomeHistory, 1);
+
   return (
     <div className="px-4 pt-4 pb-24 max-w-lg mx-auto space-y-4">
       <NotificationToast notifications={notifications} onDismiss={dismissNotification} />
@@ -155,7 +209,7 @@ const HomeScreen = () => {
         </div>
         <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 glass-card rounded-xl">
           <Bell size={20} className="text-foreground" />
-          {alerts.some(a => !a.startsWith("✅")) && (
+          {alerts.some((a) => !a.startsWith("✅")) && (
             <motion.span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-destructive" animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
           )}
         </button>
@@ -196,6 +250,79 @@ const HomeScreen = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Fraud Alert */}
+      <AnimatePresence>
+        {fraudAlert && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="glass-card border border-destructive/30 p-3 flex items-start gap-2"
+          >
+            <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-destructive">⚠️ Suspicious Income Detected</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{fraudAlert}</p>
+            </div>
+            <button onClick={() => setFraudAlert(null)} className="text-muted-foreground hover:text-foreground">
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Dynamic Premium Card */}
+      {weather && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl gradient-accent">
+              <DollarSign size={16} className="text-foreground" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Dynamic Premium</p>
+              <p className="text-sm font-bold text-foreground">₹{premium.amount}/day</p>
+            </div>
+          </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${riskScore > 70 ? "bg-destructive/20 text-destructive" : riskScore > 40 ? "bg-warning/20 text-warning" : "bg-accent/20 neon-text-green"}`}>
+            {premium.label}
+          </span>
+        </motion.div>
+      )}
+
+      {/* Daily Income Tracker */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card-glow p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 size={14} className="text-muted-foreground" />
+            <span className="text-xs font-semibold text-foreground">Daily Income Tracker</span>
+          </div>
+          <span className="text-xs text-muted-foreground">Avg: <span className="font-bold neon-text-green">₹{avgIncome}</span></span>
+        </div>
+        <div className="flex items-end gap-1.5 h-16">
+          {incomeHistory.map((val, i) => {
+            const height = maxIncome > 0 ? (val / maxIncome) * 100 : 0;
+            return (
+              <motion.div
+                key={i}
+                className="flex-1 rounded-t-sm bg-gradient-to-t from-accent/60 to-accent/20 relative group cursor-default"
+                initial={{ height: 0 }}
+                animate={{ height: `${Math.max(height, 4)}%` }}
+                transition={{ delay: i * 0.05, duration: 0.4 }}
+              >
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  ₹{val}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-muted-foreground">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+      </motion.div>
 
       {/* Live Risk Map */}
       {weather && userCoords && (
@@ -239,6 +366,24 @@ const HomeScreen = () => {
         </motion.div>
       )}
 
+      {/* Auto Trigger Status */}
+      {systemResult?.trigger.triggered && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-card border border-accent/30 p-3 space-y-2"
+        >
+          <div className="flex items-center gap-2">
+            <Zap size={14} className="neon-text-green" />
+            <span className="text-xs font-semibold text-foreground">⚡ Auto-Trigger Active</span>
+          </div>
+          {systemResult.trigger.reasons.map((r, i) => (
+            <p key={i} className="text-[11px] text-muted-foreground ml-5">{r}</p>
+          ))}
+          <p className="text-[10px] neon-text-green ml-5">Payout: ₹{systemResult.payout} (avg income × 50%)</p>
+        </motion.div>
+      )}
+
       {/* Wallet */}
       <WalletCard claims={claims} />
 
@@ -266,11 +411,19 @@ const HomeScreen = () => {
         </div>
       </motion.div>
 
-      {/* AI Explanation */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="glass-card p-3">
+      {/* System Flow Summary */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="glass-card p-3 space-y-1.5">
+        <p className="text-[10px] font-semibold text-muted-foreground text-center">🔄 Automated System Flow</p>
+        <div className="flex items-center justify-center gap-1 text-[9px] text-muted-foreground flex-wrap">
+          {["Weather", "→", "Risk", "→", "Premium", "→", "Trigger", "→", "Claim"].map((s, i) => (
+            <span key={i} className={s === "→" ? "text-accent" : "glass-card px-1.5 py-0.5 rounded text-foreground"}>
+              {s}
+            </span>
+          ))}
+        </div>
         <p className="text-[10px] text-muted-foreground text-center">
-          🧠 Risk calculated using real-time weather, location data, and historical patterns. 
-          <span className="neon-text-blue ml-1 cursor-help" title="We combine rain probability (40%), temperature extremes (30%), air quality index (20%), and wind speed (10%) to compute your risk score.">How it works →</span>
+          🧠 Risk calculated using real-time weather, location data, and historical patterns.
+          <span className="neon-text-blue ml-1 cursor-help" title="We combine rain (40%), temperature (30%), AQI (20%), and wind (10%) to compute your risk score.">How it works →</span>
         </p>
       </motion.div>
     </div>
