@@ -48,11 +48,14 @@ function weatherCodeToDescription(code: number): { description: string; icon: st
 async function reverseGeocode(lat: number, lon: number): Promise<string> {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14`
     );
     if (!res.ok) return "Unknown";
     const data = await res.json();
-    return data.address?.city || data.address?.town || data.address?.village || data.address?.state || "Unknown";
+    const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || "";
+    const state = data.address?.state || "";
+    if (city && state) return `${city}, ${state}`;
+    return city || state || "Unknown";
   } catch {
     return "Unknown";
   }
