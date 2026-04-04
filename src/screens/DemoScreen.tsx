@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { CloudRain, Zap, TrendingDown, Loader2, ShieldAlert, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { CloudRain, Zap, TrendingDown, Loader2, ShieldAlert, AlertTriangle, CheckCircle2, DollarSign } from "lucide-react";
 import { useState } from "react";
 import PaymentPopup from "../components/PaymentPopup";
 import { getRiskScore, createClaim } from "../lib/supabase-store";
 import { useAnimatedCounter } from "../hooks/useAnimatedCounter";
 import { toast } from "@/hooks/use-toast";
 import ClaimTimeline from "@/components/ClaimTimeline";
+import { validateIncome, getAverageIncome, getDynamicPremium, addDailyIncome } from "@/lib/income-tracker";
 
 const DemoScreen = () => {
   const [step, setStep] = useState<"idle" | "validating" | "loading" | "fraud" | "success">("idle");
@@ -14,21 +15,42 @@ const DemoScreen = () => {
   const [lossPct, setLossPct] = useState(50);
   const [fraudMsg, setFraudMsg] = useState("");
   const [claimPayout, setClaimPayout] = useState(0);
+  const [incomeWarning, setIncomeWarning] = useState<string | null>(null);
 
-  const payout = Math.round(income * (lossPct / 100));
-  const animatedPayout = useAnimatedCounter(payout, 600);
   const riskScore = getRiskScore();
+  const avgIncome = getAverageIncome();
+  const premium = getDynamicPremium(riskScore);
+
+  // Validate income on change
+  const handleIncomeChange = (val: number) => {
+    setIncome(Math.max(0, val));
+    const validation = validateIncome(val);
+    if (validation.suspicious) {
+      setIncomeWarning(validation.message || null);
+    } else {
+      setIncomeWarning(null);
+    }
+  };
+
+  // Use validated income for payout
+  const validation = validateIncome(income);
+  const effectiveIncome = validation.adjustedIncome;
+  const payout = Math.round(effectiveIncome * (lossPct / 100));
+  const animatedPayout = useAnimatedCounter(payout, 600);
 
   const handleSimulate = async () => {
     setStep("validating");
     setTimelineStep(1);
+
+    // Track income
+    addDailyIncome(income);
 
     setTimeout(async () => {
       setTimelineStep(2);
       try {
         setStep("loading");
         setTimelineStep(3);
-        const result = await createClaim(income, lossPct, "Rain Claim", riskScore);
+        const result = await createClaim(effectiveIncome, lossPct, "Rain Claim", riskScore);
         setClaimPayout(result.payout);
         setTimelineStep(4);
         setTimeout(() => setStep("success"), 1500);
@@ -67,9 +89,9 @@ const DemoScreen = () => {
         </div>
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Income", value: `₹${income}/day`, icon: TrendingDown },
+            { label: "Avg Income", value: `₹${avgIncome}/day`, icon: TrendingDown },
             { label: "Rain", value: "YES", icon: CloudRain },
-            { label: "Loss", value: `${lossPct}%`, icon: Zap },
+            { label: "Premium", value: `₹${premium.amount}`, icon: DollarSign },
           ].map((item) => (
             <div key={item.label} className="glass-card p-3 text-center space-y-1">
               <item.icon size={16} className="mx-auto text-muted-foreground" />
@@ -83,7 +105,24 @@ const DemoScreen = () => {
       <div className="glass-card p-4 space-y-4">
         <div className="space-y-2">
           <label className="text-xs text-muted-foreground">Daily Income (₹)</label>
-          <input type="number" value={income} onChange={(e) => setIncome(Math.max(0, Number(e.target.value)))} className="w-full glass-card p-3 bg-transparent text-foreground outline-none rounded-xl text-sm font-semibold" />
+          <input type="number" value={income} onChange={(e) => handleIncomeChange(Number(e.target.value))} className="w-full glass-card p-3 bg-transparent text-foreground outline-none rounded-xl text-sm font-semibold" />
+          {/* Income Fraud Warning */}
+          <AnimatePresence>
+            {incomeWarning && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex items-start gap-1.5 text-[10px] text-destructive mt-1"
+              >
+                <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                <span>{incomeWarning}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {avgIncome > 0 && (
+            <p className="text-[10px] text-muted-foreground">7-day avg: ₹{avgIncome} • Using {validation.suspicious ? "average" : "entered"} income for payout</p>
+          )}
         </div>
         <div className="space-y-2">
           <div className="flex justify-between text-xs">
@@ -95,8 +134,9 @@ const DemoScreen = () => {
       </div>
 
       <div className="glass-card p-4 space-y-2">
-        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Daily Income</span><span className="text-foreground">₹{income}</span></div>
+        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Effective Income</span><span className="text-foreground">₹{effectiveIncome}</span></div>
         <div className="flex justify-between text-sm"><span className="text-muted-foreground">Loss Percentage</span><span className="text-destructive">-{lossPct}%</span></div>
+        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Dynamic Premium</span><span className="text-foreground">₹{premium.amount}/day</span></div>
         <div className="h-px bg-white/10 my-1" />
         <div className="flex justify-between text-sm font-bold"><span className="text-foreground">Estimated Payout</span><span className="neon-text-green text-lg">₹{animatedPayout}</span></div>
       </div>
@@ -119,7 +159,7 @@ const DemoScreen = () => {
           <motion.div key="validating" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="glass-card-glow p-6 text-center space-y-3">
             <ShieldAlert size={36} className="mx-auto neon-text-blue animate-pulse" />
             <p className="text-sm font-semibold text-foreground">🔍 Running risk validation...</p>
-            <p className="text-xs text-muted-foreground">Checking fraud patterns & risk level</p>
+            <p className="text-xs text-muted-foreground">Checking fraud patterns, income validation & risk level</p>
           </motion.div>
         )}
         {step === "fraud" && (
